@@ -115,6 +115,49 @@
       ELO: K=24, sākums 1000. 3-komandu raundā uzvarētāji “uzvar” pret abām citām komandām.
     </div>
   </div>
+<script type="module">
+  // Firebase SDK (web, bez npm)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { 
+    getFirestore, doc, getDoc, setDoc, updateDoc,
+    collection, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // 🔐 TAVS firebaseConfig
+  const firebaseConfig = {
+    apiKey: "AIzaSyCybzKkKkLuwerfvEjO0_a1uh8-NJuUqDI",
+    authDomain: "sals-liga.firebaseapp.com",
+    projectId: "sals-liga",
+    storageBucket: "sals-liga.firebasestorage.app",
+    messagingSenderId: "121070579037",
+    appId: "1:121070579037:web:d5cfa4bb6841e5f25c8cb4"
+  };
+
+  // Init
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Anonymous login (bez e-pasta/paroles)
+  signInAnonymously(auth).catch(console.error);
+
+  // 🌍 League ID (VIENS KOPĪGS VISIEM)
+  window.LEAGUE_ID = "sals-liga";
+
+  // 🧠 Palīgobjekti globālai pieejai
+  window.firebaseCtx = {
+    db,
+    auth,
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    collection,
+    onSnapshot,
+    serverTimestamp
+  };
+</script>
 
 <script>
   const KEY = "dika_hokeja_liga_v2_sessions";
