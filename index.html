@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="lv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dīķa hokeja līga — Sesijas</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 16px; max-width: 1200px; }
+    h1 { margin: 0 0 10px; }
+    h2 { margin: 0 0 10px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 12px; margin: 12px 0; }
+    label { display:block; font-size: 12px; opacity: .8; margin-bottom: 4px; }
+    input, select, button, textarea { padding: 8px; border-radius: 10px; border: 1px solid #ccc; }
+    button { cursor:pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+    th { position: sticky; top: 0; background: #fff; z-index: 1; }
+    .muted { opacity: .7; font-size: 12px; }
+    .pill { display:inline-block; padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; margin: 2px 4px 2px 0; }
+    .danger { border-color: #ffb3b3; background:#fff5f5; }
+    .ok { border-color: #b8f0c2; background:#f5fff7; }
+    .grid { display:grid; gap:10px; }
+    @media (min-width: 920px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 999px; }
+    .btn-ghost { background: #fff; }
+    .btn-primary { background: #111; color: #fff; border-color:#111; }
+    .btn-primary:hover { opacity:.9; }
+    .btn-ghost:hover { background:#fafafa; }
+    .warn { border-color:#ffd7a3; background:#fff9f0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <h1>🏒 Dīķa hokeja līga</h1>
+  <div class="muted">
+    Modelis: <b>Sesija</b> = ierašanās (tavs “maču skaits sezonā”). <b>Raundi</b> ir pēc izvēles (uzvaras + ELO + G/A).
+    Viss glabājas tavā pārlūkā (LocalStorage). Vari eksportēt/importēt JSON.
+  </div>
+
+  <div class="card">
+    <h2>1) Spēlētāji</h2>
+    <div class="row">
+      <div>
+        <label>Jauns spēlētājs</label>
+        <input id="playerName" placeholder="piem. Jānis" />
+      </div>
+      <button id="addPlayer" class="btn-primary">Pievienot</button>
+      <button id="resetAll" class="danger">Notīrīt visu sezonu</button>
+    </div>
+    <div class="muted" style="margin-top:6px;">Tip: pievieno ~30 spēlētājus. Dzēst var tikai tos, kas nav izmantoti sesijās.</div>
+    <div id="playerList" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h2>2) Jauna sesija (viens hokeja vakars)</h2>
+
+      <div class="row">
+        <div>
+          <label>Datums (pēc izvēles)</label>
+          <input id="sessionDate" placeholder="piem. 2026-01-16 vai Piektdiena" />
+        </div>
+        <button id="createSession" class="btn-primary">Izveidot sesiju</button>
+      </div>
+
+      <div class="muted" style="margin-top:8px;">
+        Pēc izveides atzīmē, kuri atnāca. Tas katram pieskaita <b>+1 sesiju</b>.
+        Pēc tam vari (vai nevari) pievienot raundus.
+      </div>
+
+      <div id="sessionsList" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>3) Aktīvā sesija</h2>
+      <div id="activeSessionBox" class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4) Reitings un statistika</h2>
+    <div class="row">
+      <button id="exportBtn">Eksportēt JSON</button>
+      <label class="pill">
+        Importēt JSON <input id="importFile" type="file" accept="application/json" style="display:none;">
+      </label>
+      <span class="muted">Tabula: Sesijas=ierašanās, Spēles=raundi, Uzvaras=no raundiem, ELO=dinamisks reitings.</span>
+    </div>
+
+    <div style="overflow:auto; max-height: 460px; margin-top:10px;">
+      <table id="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Spēlētājs</th>
+            <th>Sesijas</th>
+            <th>Spēles</th>
+            <th>Uzvaras</th>
+            <th>Win%</th>
+            <th>ELO</th>
+            <th>G</th>
+            <th>A</th>
+            <th>P</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="muted" style="margin-top:8px;">
+      ELO: K=24, sākums 1000. 3-komandu raundā uzvarētāji “uzvar” pret abām citām komandām.
+    </div>
+  </div>
+
+<script>
+  const KEY = "dika_hokeja_liga_v2_sessions";
+
+  const state = load() || {
+    players: [],   // {id, name, sessions, games, wins, elo, g, a}
+    sessions: [],  // {id, ts, label, attendees:[playerId], rounds:[round]}
+    activeSessionId: null
+  };
+
+  function uid() { return Math.random().toString(36).slice(2,10); }
+  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
+  const el = (id) => document.getElementById(id);
+
+  function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmtTs(ts){ return new Date(ts).toLocaleString(); }
+
+  // --- Players ---
+  function addPlayer(name) {
+    name = (name||"").trim();
+    if (!name) return;
+    if (state.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return alert("Šāds spēlētājs jau ir.");
+    state.players.push({ id: uid(), name, sessions: 0, games: 0, wins: 0, elo: 1000, g: 0, a: 0 });
+    save(); renderAll();
+  }
+
+  function playerUsed(id){
+    return state.sessions.some(s => (s.attendees||[]).includes(id) || (s.rounds||[]).some(r => (r.participants||[]).includes(id)));
+  }
+
+  function deletePlayer(id) {
+    if (playerUsed(id)) return alert("Nevar dzēst: spēlētājs jau ir sesijās/raundos. (Varam pievienot 'arhivēt'.)");
+    state.players = state.players.filter(p => p.id !== id);
+    save(); renderAll();
+  }
+
+  function renderPlayers() {
+    const list = state.players
+      .slice()
+      .sort((a,b)=> a.name.localeCompare(b.name, 'lv'))
+      .map(p => `<span class="pill">${escapeHtml(p.name)} <button class="btn-sm btn-ghost" data-del="${p.id}" title="Dzēst">×</button></span>`)
+      .join(" ");
+    el("playerList").innerHTML = list || `<span class="muted">Nav spēlētāju. Pievieno pirmos!</span>`;
+  }
+
+  // --- Sessions ---
+  function createSession(label) {
+    const s = {
+      id: uid(),
+      ts: Date.now(),
+      label: (label||"").trim() || "Hokeja sesija",
+      attendees: [],
+      rounds: []
+    };
+    state.sessions.push(s);
+    state.activeSessionId = s.id;
+    save(); renderAll();
+  }
+
+  function setActiveSession(id){
+    state.activeSessionId = id;
+    save(); renderAll();
+  }
+
+  function getActiveSession(){
+    return state.sessions.find(s => s.id === state.activeSessionId) || null;
+  }
+
+  function toggleAttendance(playerId, present){
+    const s = getActiveSession();
+    if (!s) return;
+
+    const had = s.attendees.includes(playerId);
+    if (present && !had){
+      s.attendees.push(playerId);
+      // sessions +1
+      const p = state.players.find(x => x.id === playerId);
+      if (p) p.sessions += 1;
+    }
+    if (!present && had){
+      // Removing attendance is tricky if rounds already exist; disallow to keep integrity.
+      if ((s.rounds||[]).length > 0){
+        return alert("Nevar noņemt ierašanos, ja jau ir raundi. (Dzēs raundus vai izveido jaunu sesiju.)");
+      }
+      s.attendees = s.attendees.filter(id => id !== playerId);
+      const p = state.players.find(x => x.id === playerId);
+      if (p && p.sessions > 0) p.sessions -= 1;
+    }
+    save(); renderAll();
+  }
+
+  function deleteSession(sessionId){
+    const s = state.sessions.find(x => x.id === sessionId);
+    if (!s) return;
+
+    // Roll back stats from this session (attendance + rounds)
+    // 1) attendance
+    for (const pid of (s.attendees||[])){
+      const p = state.players.find(x => x.id === pid);
+      if (p && p.sessions > 0) p.sessions -= 1;
+    }
+    // 2) rounds effects: games, wins, elo, g, a
+    // To keep it simple and reliable, we will NOT attempt to reverse ELO precisely round-by-round.
+    // Instead: recompute everything from scratch after removing.
+    state.sessions = state.sessions.filter(x => x.id !== sessionId);
+    if (state.activeSessionId === sessionId) state.activeSessionId = state.sessions.at(-1)?.id || null;
+
+    recomputeAllStatsFromSessions();
+    save(); renderAll();
+  }
+
+  // --- Rounds / Teaming ---
+  function suggestedSplit(n){
+    // Returns array of team sizes (2 or 3 teams) for common cases, else a reasonable split.
+    if (n === 6) return [3,3];
+    if (n === 7) return [4,3];
+    if (n === 8) return [4,4];
+    if (n === 9) return [3,3,3];
+    if (n === 10) return [5,5];
+    if (n === 11) return [4,4,3];
+    if (n === 12) return [4,4,4];
+    // fallback: prefer 3 teams if >=9, else 2 teams
+    if (n >= 9){
+      // split into 3 teams as evenly as possible
+      const base = Math.floor(n/3);
+      const rem = n % 3;
+      const sizes = [base, base, base];
+      for (let i=0;i<rem;i++) sizes[i] += 1;
+      return sizes;
+    } else {
+      const a = Math.ceil(n/2);
+      const b = n - a;
+      return [a,b];
+    }
+  }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for (let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function makeTeams(attendees){
+    const n = attendees.length;
+    const sizes = suggestedSplit(n);
+    const ids = shuffle(attendees);
+
+    const teams = [];
+    let idx = 0;
+    for (let t=0;t<sizes.length;t++){
+      teams.push(ids.slice(idx, idx + sizes[t]));
+      idx += sizes[t];
+    }
+    return teams; // array of arrays
+  }
+
+  function eloExpected(rA, rB){
+    return 1 / (1 + Math.pow(10, (rB - rA)/400));
+  }
+
+  function eloUpdateTeamVsTeam(teamAIds, teamBIds, scoreA, scoreB, K=24){
+    // Use average team rating, then apply delta to each member scaled by 1 (simple)
+    const avg = (ids) => ids.reduce((s,id)=> s + (state.players.find(p=>p.id===id)?.elo ?? 1000), 0) / Math.max(1,ids.length);
+    const rA = avg(teamAIds), rB = avg(teamBIds);
+    const eA = eloExpected(rA, rB);
+    const eB = 1 - eA;
+
+    const sA = scoreA, sB = scoreB;
+    const dA = K * (sA - eA);
+    const dB = K * (sB - eB);
+
+    for (const id of teamAIds){
+      const p = state.players.find(x => x.id === id);
+      if (p) p.elo += dA;
+    }
+    for (const id of teamBIds){
+      const p = state.players.find(x => x.id === id);
+      if (p) p.elo += dB;
+    }
+  }
+
+  function addRound({teams, winnerIndex, scoreText, notes, gaEvents}){
+    const s = getActiveSession();
+    if (!s) return alert("Nav aktīvas sesijas.");
+
+    const participants = teams.flat();
+    if (participants.length < 2) return alert("Par maz spēlētāju.");
+    const uniq = new Set(participants);
+    if (uniq.size !== participants.length) return alert("Vienā raundā spēlētājs nedrīkst būt 2 komandās.");
+
+    // Create round object
+    const round = {
+      id: uid(),
+      ts: Date.now(),
+      teams, // array of arrays
+      winnerIndex, // 0..teams-1
+      scoreText: (scoreText||"").trim(),
+      notes: (notes||"").trim(),
+      gaEvents: gaEvents || [] // {type:'G'|'A', playerId}
+    };
+    s.rounds.push(round);
+
+    // Update stats: games+1 for participants
+    for (const pid of participants){
+      const p = state.players.find(x => x.id === pid);
+      if (p) p.games += 1;
+    }
+    // wins+1 for winners
+    const winners = teams[winnerIndex] || [];
+    for (const pid of winners){
+      const p = state.players.find(x => x.id === pid);
+      if (p) p.wins += 1;
+    }
+
+    // Goals/assists
+    for (const ev of (round.gaEvents||[])){
+      const p = state.players.find(x => x.id === ev.playerId);
+      if (!p) continue;
+      if (ev.type === "G") p.g += 1;
+      if (ev.type === "A") p.a += 1;
+    }
+
+    // ELO
+    // If 2 teams: one matchup.
+    // If 3 teams: winner beats both others (two matchups).
+    // If >3 teams: treat winner vs each other (rare; still works).
+    const K = 24;
+    const W = teams[winnerIndex] || [];
+    for (let i=0;i<teams.length;i++){
+      if (i === winnerIndex) continue;
+      const L = teams[i];
+      // winner gets 1, loser gets 0
+      eloUpdateTeamVsTeam(W, L, 1, 0, K);
+    }
+
+    save(); renderAll();
+  }
+
+  function deleteRound(roundId){
+    // Similar to session deletion: recompute to keep ELO correct.
+    const s = getActiveSession();
+    if (!s) return;
+    s.rounds = (s.rounds||[]).filter(r => r.id !== roundId);
+    recomputeAllStatsFromSessions();
+    save(); renderAll();
+  }
+
+  function recomputeAllStatsFromSessions(){
+    // Reset players
+    for (const p of state.players){
+      p.sessions = 0; p.games = 0; p.wins = 0; p.elo = 1000; p.g = 0; p.a = 0;
+    }
+    // Re-apply sessions and rounds in chronological order
+    const sessions = state.sessions.slice().sort((a,b)=>a.ts-b.ts);
+    for (const s of sessions){
+      for (const pid of (s.attendees||[])){
+        const p = state.players.find(x => x.id === pid);
+        if (p) p.sessions += 1;
+      }
+      const rounds = (s.rounds||[]).slice().sort((a,b)=>a.ts-b.ts);
+      for (const r of rounds){
+        const participants = (r.teams||[]).flat();
+        for (const pid of participants){
+          const p = state.players.find(x => x.id === pid);
+          if (p) p.games += 1;
+        }
+        const winners = (r.teams||[])[r.winnerIndex] || [];
+        for (const pid of winners){
+          const p = state.players.find(x => x.id === pid);
+          if (p) p.wins += 1;
+        }
+        for (const ev of (r.gaEvents||[])){
+          const p = state.players.find(x => x.id === ev.playerId);
+          if (!p) continue;
+          if (ev.type === "G") p.g += 1;
+          if (ev.type === "A") p.a += 1;
+        }
+        const teams = r.teams || [];
+        const W = teams[r.winnerIndex] || [];
+        for (let i=0;i<teams.length;i++){
+          if (i === r.winnerIndex) continue;
+          eloUpdateTeamVsTeam(W, teams[i], 1, 0, 24);
+        }
+      }
+    }
+  }
+
+  // --- Rendering Active Session UI ---
+  function renderSessionsList(){
+    const sorted = state.sessions.slice().sort((a,b)=>b.ts-a.ts);
+    el("sessionsList").innerHTML = sorted.map(s => {
+      const isActive = s.id === state.activeSessionId;
+      const att = (s.attendees||[]).length;
+      const rnd = (s.rounds||[]).length;
+      return `<div class="card" style="margin:8px 0;">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <b>${escapeHtml(s.label)}</b> <span class="muted">(${fmtTs(s.ts)})</span><br/>
+            <span class="pill">Atnākuši: ${att}</span>
+            <span class="pill">Raundi: ${rnd}</span>
+            ${isActive ? `<span class="pill ok">Aktīva</span>` : ``}
+          </div>
+          <div class="row">
+            <button class="btn-sm btn-ghost" data-setactive="${s.id}">Atvērt</button>
+            <button class="btn-sm danger" data-delsession="${s.id}">Dzēst sesiju</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("") || `<span class="muted">Nav sesiju. Izveido pirmo.</span>`;
+  }
+
+  function renderActiveSession(){
+    const s = getActiveSession();
+    if (!s){
+      el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
+      return;
+    }
+
+    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
+
+    const attendees = (s.attendees||[]).slice();
+    const n = attendees.length;
+    const split = suggestedSplit(n);
+    const splitText = split.length === 2 ? `${split[0]}v${split[1]}` : `${split[0]}v${split[1]}v${split[2]}`;
+
+    // Attendance checklist
+    const checkList = state.players
+      .slice()
+      .sort((a,b)=>a.name.localeCompare(b.name,'lv'))
+      .map(p => {
+        const checked = s.attendees.includes(p.id);
+        return `<label class="pill" style="cursor:pointer;">
+          <input type="checkbox" data-att="${p.id}" ${checked ? "checked" : ""} /> ${escapeHtml(p.name)}
+        </label>`;
+      }).join(" ");
+
+    // Rounds list
+    const rounds = (s.rounds||[]).slice().sort((a,b)=>b.ts-a.ts);
+    const roundsHtml = rounds.map(r => {
+      const teams = r.teams || [];
+      const teamLabels = teams.map((t,idx)=>{
+        const label = String.fromCharCode(65+idx); // A, B, C...
+        const players = t.map(nameOf).join(", ");
+        const win = (idx === r.winnerIndex) ? " 🏆" : "";
+        return `<div class="muted"><b>${label}${win}</b>: ${escapeHtml(players)}</div>`;
+      }).join("");
+      const ga = (r.gaEvents||[]).map(ev => `${ev.type}:${nameOf(ev.playerId)}`).join(", ");
+      return `<div class="card" style="margin:8px 0;">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <b>${fmtTs(r.ts)}</b>
+            ${r.scoreText ? ` · <span class="pill">${escapeHtml(r.scoreText)}</span>` : ""}
+          </div>
+          <button class="btn-sm danger" data-delround="${r.id}">Dzēst raundu</button>
+        </div>
+        ${teamLabels}
+        ${r.notes ? `<div style="margin-top:6px;">📝 ${escapeHtml(r.notes)}</div>` : ``}
+        ${ga ? `<div class="muted" style="margin-top:6px;">G/A: ${escapeHtml(ga)}</div>` : ``}
+      </div>`;
+    }).join("") || `<span class="muted">Nav raundu. (Tas ir ok.)</span>`;
+
+    // Round creator UI
+    const attendeeOptions = attendees.map(id => `<option value="${id}">${escapeHtml(nameOf(id))}</option>`).join("");
+    const teamCount = split.length;
+
+    const makeSelect = (id) => `<select id="${id}"><option value="">—</option>${attendeeOptions}</select>`;
+
+    // manual team selectors based on suggested split
+    let manualTeamsHtml = "";
+    for (let t=0;t<teamCount;t++){
+      const size = split[t];
+      const label = String.fromCharCode(65+t);
+      manualTeamsHtml += `<div class="card" style="margin:0;">
+        <div><b>${label} komanda</b> <span class="muted">(${size})</span></div>
+        <div class="row" style="margin-top:6px;">${Array.from({length:size}).map((_,i)=>makeSelect(`m_${t}_${i}`)).join("")}</div>
+      </div>`;
+    }
+
+    const winnerOptions = Array.from({length:teamCount}).map((_,i)=>{
+      const label = String.fromCharCode(65+i);
+      return `<option value="${i}">${label}</option>`;
+    }).join("");
+
+    el("activeSessionBox").innerHTML = `
+      <div>
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <b>${escapeHtml(s.label)}</b> <span class="muted">(${fmtTs(s.ts)})</span><br/>
+            <span class="pill">Atnākuši: ${n}</span>
+            <span class="pill">Ieteiktais formāts: ${splitText}</span>
+          </div>
+          <div class="row">
+            <button id="autoTeams" class="btn-sm btn-primary">Auto komandas</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin:10px 0;">
+          <div><b>Atnākušie</b> <span class="muted">(atzīmē, kuri ir klāt — tas skaita sesijas)</span></div>
+          <div style="margin-top:8px;">${checkList}</div>
+          <div class="muted" style="margin-top:8px;">⚠️ Ja jau ir raundi, ierašanos noņemt nevar (lai nesajūk statistika).</div>
+        </div>
+
+        <div class="card warn" style="margin:10px 0;">
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <b>Quick round</b> <span class="muted">(ātri: auto komandas → izvēlies uzvarētāju → saglabā)</span>
+            </div>
+          </div>
+
+          <div id="quickTeamsBox" class="muted" style="margin-top:8px;">
+            Spied <b>Auto komandas</b>, lai ģenerētu raundu.
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label>Uzvarētājs</label>
+              <select id="q_winner">${winnerOptions}</select>
+            </div>
+            <div>
+              <label>Rezultāts (pēc izvēles)</label>
+              <input id="q_score" placeholder="piem. 2-1-0 vai 3-2" />
+            </div>
+            <div style="flex:1; min-width:260px;">
+              <label>Piezīmes (pēc izvēles)</label>
+              <input id="q_notes" placeholder="piem. komandas mainījām pēc 5 min" style="width:100%;" />
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:10px;">
+            <div><b>Goals / Assists</b> <span class="muted">(klikšķini pēc vajadzības; viss ir optional)</span></div>
+            <div id="gaBox" class="muted" style="margin-top:8px;">Nav auto komandās spēlētāju.</div>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <button id="saveQuickRound" class="btn-primary">Saglabāt raundu</button>
+            <button id="clearGA" class="btn-sm btn-ghost">Notīrīt G/A šim raundam</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin:10px 0;">
+          <div><b>Manuāls raunds</b> <span class="muted">(ja gribi pats salikt komandas)</span></div>
+          <div class="grid grid-${teamCount}" style="margin-top:8px;">${manualTeamsHtml}</div>
+
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <label>Uzvarētājs</label>
+              <select id="m_winner">${winnerOptions}</select>
+            </div>
+            <div>
+              <label>Rezultāts (pēc izvēles)</label>
+              <input id="m_score" placeholder="piem. 2-1-0 vai 3-2" />
+            </div>
+            <div style="flex:1; min-width:260px;">
+              <label>Piezīmes (pēc izvēles)</label>
+              <input id="m_notes" placeholder="piem. 4v4v3" style="width:100%;" />
+            </div>
+            <button id="saveManualRound" class="btn-primary">Saglabāt manuālu raundu</button>
+          </div>
+
+          <div class="muted" style="margin-top:6px;">
+            Padoms: manuālajā raundā izvēlies tieši <b>${n}</b> unikālus spēlētājus (bez dublikātiem).
+          </div>
+        </div>
+
+        <div class="card">
+          <div><b>Raundi šajā sesijā</b></div>
+          <div style="margin-top:8px;">${roundsHtml}</div>
+        </div>
+      </div>
+    `;
+
+    // Wire active session handlers
+    wireActiveSessionHandlers();
+  }
+
+  // --- Quick round state (UI-only) ---
+  let quickTeamsCache = null; // array of arrays
+  let quickGA = []; // events for current quick round
+
+  function buildQuickTeamsUI(teams){
+    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
+    const html = teams.map((t,idx)=>{
+      const label = String.fromCharCode(65+idx);
+      return `<div class="card" style="margin:6px 0;">
+        <b>${label} komanda</b> <span class="muted">(${t.length})</span><br/>
+        ${t.map(id=>`<span class="pill">${escapeHtml(nameOf(id))}</span>`).join("")}
+      </div>`;
+    }).join("");
+    el("quickTeamsBox").innerHTML = html || `<span class="muted">Nav komandu.</span>`;
+
+    // GA buttons
+    const players = teams.flat();
+    if (players.length === 0){
+      el("gaBox").innerHTML = `<span class="muted">Nav auto komandās spēlētāju.</span>`;
+      return;
+    }
+    el("gaBox").innerHTML = players.map(pid=>{
+      const nm = escapeHtml(nameOf(pid));
+      return `<span class="pill">
+        ${nm}
+        <button class="btn-sm btn-ghost" data-ga="G" data-p="${pid}">+G</button>
+        <button class="btn-sm btn-ghost" data-ga="A" data-p="${pid}">+A</button>
+      </span>`;
+    }).join(" ");
+
+    renderQuickGASummary();
+  }
+
+  function renderQuickGASummary(){
+    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
+    const g = quickGA.filter(e=>e.type==="G");
+    const a = quickGA.filter(e=>e.type==="A");
+    const sum = (arr) => arr.map(e=>nameOf(e.playerId)).join(", ");
+    const line = `G: ${sum(g) || "—"} · A: ${sum(a) || "—"}`;
+    // show in muted line above gaBox? We'll append a small line:
+    // (simple: add to title via a small element)
+    // We'll just ensure there's a small summary at top:
+    // If not present, add.
+    const existing = document.getElementById("gaSummary");
+    if (existing){
+      existing.textContent = line;
+    } else {
+      const box = el("gaBox");
+      const div = document.createElement("div");
+      div.id = "gaSummary";
+      div.className = "muted";
+      div.style.marginBottom = "8px";
+      div.textContent = line;
+      box.parentElement.insertBefore(div, box);
+    }
+  }
+
+  function wireActiveSessionHandlers(){
+    // Attendance toggles
+    document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb=>{
+      cb.onchange = () => toggleAttendance(cb.getAttribute("data-att"), cb.checked);
+    });
+
+    // Auto teams
+    const autoBtn = document.getElementById("autoTeams");
+    if (autoBtn){
+      autoBtn.onclick = () => {
+        const s = getActiveSession();
+        if (!s) return;
+        if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
+        quickTeamsCache = makeTeams(s.attendees);
+        quickGA = [];
+        buildQuickTeamsUI(quickTeamsCache);
+      };
+    }
+
+    // GA buttons
+    document.body.addEventListener("click", (e) => {
+      const type = e.target?.getAttribute?.("data-ga");
+      const pid = e.target?.getAttribute?.("data-p");
+      if (!type || !pid) return;
+      if (!quickTeamsCache) return;
+      quickGA.push({type, playerId: pid});
+      renderQuickGASummary();
+    }, { once: true }); // we'll re-bind below properly in global handler
+
+    // Save quick round
+    const saveQ = document.getElementById("saveQuickRound");
+    if (saveQ){
+      saveQ.onclick = () => {
+        const s = getActiveSession();
+        if (!s) return;
+        if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
+        const wi = Number(document.getElementById("q_winner").value);
+        const score = document.getElementById("q_score").value;
+        const notes = document.getElementById("q_notes").value;
+        addRound({teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes, gaEvents: quickGA});
+        // clear input fields for next round
+        document.getElementById("q_score").value = "";
+        document.getElementById("q_notes").value = "";
+        quickGA = [];
+        renderAll();
+      };
+    }
+
+    const clearGA = document.getElementById("clearGA");
+    if (clearGA){
+      clearGA.onclick = () => {
+        quickGA = [];
+        renderAll();
+      };
+    }
+
+    // Save manual round
+    const saveM = document.getElementById("saveManualRound");
+    if (saveM){
+      saveM.onclick = () => {
+        const s = getActiveSession();
+        if (!s) return;
+
+        const n = (s.attendees||[]).length;
+        if (n < 2) return alert("Atzīmē atnākušos.");
+
+        const split = suggestedSplit(n);
+        const teamCount = split.length;
+
+        const teams = [];
+        for (let t=0;t<teamCount;t++){
+          const size = split[t];
+          const ids = [];
+          for (let i=0;i<size;i++){
+            const v = document.getElementById(`m_${t}_${i}`).value;
+            if (v) ids.push(v);
+          }
+          if (ids.length !== size) return alert("Manuālajā raundā visām komandām jābūt pilnā sastāvā.");
+          teams.push(ids);
+        }
+
+        const participants = teams.flat();
+        const uniq = new Set(participants);
+        if (uniq.size !== participants.length) return alert("Vienu un to pašu spēlētāju nevar ielikt 2 reizes.");
+        // optional: ensure all attendees are used? not required, but usually yes
+        // We'll allow subset if someone sēž malā.
+
+        const wi = Number(document.getElementById("m_winner").value);
+        const score = document.getElementById("m_score").value;
+        const notes = document.getElementById("m_notes").value;
+
+        addRound({teams, winnerIndex: wi, scoreText: score, notes, gaEvents: []});
+        document.getElementById("m_score").value = "";
+        document.getElementById("m_notes").value = "";
+        renderAll();
+      };
+    }
+
+    // Delete round buttons
+    document.querySelectorAll("[data-delround]").forEach(btn=>{
+      btn.onclick = () => {
+        if (!confirm("Dzēst šo raundu?")) return;
+        deleteRound(btn.getAttribute("data-delround"));
+      };
+    });
+  }
+
+  // Global click handler (safe)
+  document.body.addEventListener("click", (e) => {
+    const del = e.target?.getAttribute?.("data-del");
+    if (del) deletePlayer(del);
+
+    const setactive = e.target?.getAttribute?.("data-setactive");
+    if (setactive) setActiveSession(setactive);
+
+    const dels = e.target?.getAttribute?.("data-delsession");
+    if (dels){
+      if (!confirm("Dzēst sesiju? (Tiks pārrēķināta statistika.)")) return;
+      deleteSession(dels);
+    }
+
+    const type = e.target?.getAttribute?.("data-ga");
+    const pid = e.target?.getAttribute?.("data-p");
+    if (type && pid){
+      if (!quickTeamsCache) return;
+      quickGA.push({type, playerId: pid});
+      renderQuickGASummary();
+    }
+  });
+
+  // --- Table ---
+  function renderTable() {
+    const sorted = [...state.players].sort((p,q) => {
+      if ((q.elo||0) !== (p.elo||0)) return (q.elo||0) - (p.elo||0);
+      const wp = p.games ? p.wins/p.games : 0;
+      const wq = q.games ? q.wins/q.games : 0;
+      if (wq !== wp) return wq - wp;
+      return (q.sessions||0) - (p.sessions||0);
+    });
+
+    const rows = sorted.map((p,i) => {
+      const wp = p.games ? (100*p.wins/p.games) : 0;
+      const pts = (p.g||0) + (p.a||0);
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${p.sessions||0}</td>
+        <td>${p.games||0}</td>
+        <td>${p.wins||0}</td>
+        <td>${wp.toFixed(1)}%</td>
+        <td class="mono">${Math.round(p.elo||1000)}</td>
+        <td>${p.g||0}</td>
+        <td>${p.a||0}</td>
+        <td>${pts}</td>
+      </tr>`;
+    }).join("");
+    el("table").querySelector("tbody").innerHTML = rows || `<tr><td colspan="10" class="muted">Nav datu.</td></tr>`;
+  }
+
+  // --- Export / Import ---
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dika-hokeja-sezona.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importJSON(file) {
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const obj = JSON.parse(r.result);
+        if (!obj.players || !obj.sessions) throw new Error("Nepareizs fails.");
+        localStorage.setItem(KEY, JSON.stringify(obj));
+        location.reload();
+      } catch(e) {
+        alert("Importa kļūda: " + e.message);
+      }
+    };
+    r.readAsText(file);
+  }
+
+  function resetAll() {
+    if (!confirm("Tiešām notīrīt visu sezonu?")) return;
+    localStorage.removeItem(KEY);
+    location.reload();
+  }
+
+  // --- Render all ---
+  function renderAll() {
+    renderPlayers();
+    renderSessionsList();
+    renderActiveSession();
+    renderTable();
+  }
+
+  // --- Wire top-level events ---
+  el("addPlayer").onclick = () => { addPlayer(el("playerName").value); el("playerName").value=""; el("playerName").focus(); };
+  el("playerName").addEventListener("keydown", (e) => { if (e.key === "Enter") el("addPlayer").click(); });
+
+  el("createSession").onclick = () => {
+    createSession(el("sessionDate").value);
+    el("sessionDate").value = "";
+  };
+
+  el("exportBtn").onclick = exportJSON;
+  el("importFile").onchange = (e) => { if (e.target.files?.[0]) importJSON(e.target.files[0]); };
+
+  el("resetAll").onclick = resetAll;
+
+  // Initial render
+  renderAll();
+</script>
+</body>
+</html>
