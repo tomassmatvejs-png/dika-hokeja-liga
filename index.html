@@ -847,6 +847,35 @@ async function selfUndoLastGA(lastRoundId){
 
     // Wire active session handlers
     wireActiveSessionHandlers();
+      // Become admin (first come)
+  const become = document.getElementById("becomeAdmin");
+  if (become){
+    become.onclick = async () => {
+      const a = await fb.getDoc(adminDoc());
+      const d = a.data() || {};
+      if (d.adminUid && d.adminUid !== myUid){
+        return toast("Admins jau ir iestatīts.");
+      }
+      await fb.updateDoc(adminDoc(), { adminUid: myUid });
+      toast("Tu tagad esi admins ✅");
+    };
+  }
+
+  // Pick my player
+  const pick = document.getElementById("pickMe");
+  if (pick){
+    pick.onclick = async () => {
+      if (!state.players.length) return toast("Nav spēlētāju saraksta.");
+      const names = state.players.map(p=>p.name).join("\n");
+      const chosen = prompt("Ieraksti savu vārdu tieši kā sarakstā:\n\n" + names);
+      if (!chosen) return;
+      const p = state.players.find(x => x.name.toLowerCase() === chosen.trim().toLowerCase());
+      if (!p) return toast("Neatradu tādu vārdu. Pārbaudi pareizrakstību.");
+      await selfSetMyPlayer(p.id);
+      toast("OK ✅");
+    };
+  }
+
   }
 
   // --- Quick round state (UI-only) ---
