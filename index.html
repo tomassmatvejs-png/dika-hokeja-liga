@@ -167,6 +167,210 @@
     sessions: [],  // {id, ts, label, attendees:[playerId], rounds:[round]}
     activeSessionId: null
   };
+// ===== ONLINE (Firebase) slānis =====
+const fb = window.firebaseCtx || null;
+const LEAGUE_ID = window.LEAGUE_ID || "sals-liga";
+
+let onlineEnabled = !!fb;     // ja firebaseCtx ir, online var ieslēgt
+let onlineReady = false;
+let myUid = null;
+
+let isAdmin = false;
+let myPlayerId = null;        // kuru spēlētāju es esmu izvēlējies (self-mode)
+
+// Firestore ceļi (viena kopīga līga)
+function leagueDoc() { return fb.doc(fb.db, "leagues", LEAGUE_ID); }
+function stateDoc()  { return fb.doc(fb.db, "leagues", LEAGUE_ID, "meta", "state"); }
+function adminDoc()  { return fb.doc(fb.db, "leagues", LEAGUE_ID, "meta", "admin"); }
+function usersDoc(uid){ return fb.doc(fb.db, "leagues", LEAGUE_ID, "users", uid); }
+
+// UI helper
+function toast(msg){
+  alert(msg);
+}
+
+// Ensure league exists + subscribe to shared state
+async function initOnlineIfPossible(){
+  if (!onlineEnabled) return;
+
+  // Wait for auth
+  try {
+    const auth = fb.auth;
+    // auth.currentUser might be null right away; poll briefly
+    for (let i=0;i<40;i++){
+      if (auth.currentUser) break;
+      await new Promise(r=>setTimeout(r, 100));
+    }
+    if (!auth.currentUser) {
+      console.warn("Firebase auth not ready");
+      return;
+    }
+    myUid = auth.currentUser.uid;
+
+    // Ensure base docs exist
+    const lref = leagueDoc();
+    const l = await fb.getDoc(lref);
+    if (!l.exists()){
+      await fb.setDoc(lref, { createdAt: fb.serverTimestamp(), name: "SALS Līga" });
+    }
+
+    const aref = adminDoc();
+    const a = await fb.getDoc(aref);
+    if (!a.exists()){
+      // nav admina vēl – atstājam tukšu (iestatīsim ar pogu)
+      await fb.setDoc(aref, { adminUid: null, createdAt: fb.serverTimestamp() });
+    }
+
+    // user profile doc
+    const uref = usersDoc(myUid);
+    const u = await fb.getDoc(uref);
+    if (!u.exists()){
+      await fb.setDoc(uref, { createdAt: fb.serverTimestamp(), myPlayerId: null });
+    }
+
+    // Subscribe: admin status
+    fb.onSnapshot(aref, (snap)=>{
+      const d = snap.data() || {};
+      isAdmin = (d.adminUid && d.adminUid === myUid);
+      renderAll();
+    });
+
+    // Subscribe: my profile
+    fb.onSnapshot(uref, (snap)=>{
+      const d = snap.data() || {};
+      myPlayerId = d.myPlayerId || null;
+      renderAll();
+    });
+
+    // Subscribe: shared state
+    fb.onSnapshot(stateDoc(), (snap)=>{
+      if (!snap.exists()) return;
+      const remote = snap.data();
+      if (!remote) return;
+
+      // Replace local state with remote state
+      // (Keeping only what we store)
+      state.players = remote.players || [];
+      state.sessions = remote.sessions || [];
+      state.activeSessionId = remote.activeSessionId || null;
+
+      save(); // also keep local backup
+      onlineReady = true;
+      renderAll();
+    });
+
+    // If no state doc exists yet, seed from local or empty
+    const s = await fb.getDoc(stateDoc());
+    if (!s.exists()){
+      await pushStateToCloud(); // push local initial state
+    }
+
+  } catch (e){
+    console.error(e);
+    onlineEnabled = false;
+  }
+}
+
+// Push entire state to cloud (admin only)
+async function pushStateToCloud(){
+  if (!onlineEnabled || !fb) return;
+  if (!isAdmin) return;
+
+  await fb.setDoc(stateDoc(), {
+    players: state.players,
+    sessions: state.sessions,
+    activeSessionId: state.activeSessionId,
+    updatedAt: fb.serverTimestamp()
+  }, { merge: true });
+}
+
+// Lightweight “self” updates: attendance and GA events
+async function selfSetMyPlayer(playerId){
+  if (!onlineEnabled || !fb || !myUid) return;
+  await fb.updateDoc(usersDoc(myUid), { myPlayerId: playerId });
+}
+
+async function selfToggleAttendance(sessionId, present){
+  if (!onlineEnabled || !fb || !myPlayerId) return;
+  // We store self-actions as "selfEvents" under the session for audit and recompute
+  const sid = sessionId;
+  const s = state.sessions.find(x=>x.id===sid);
+  if (!s) return;
+
+  // apply locally (optimistic)
+  const had = (s.attendees||[]).includes(myPlayerId);
+  if (present && !had){
+    s.attendees.push(myPlayerId);
+  }
+  if (!present && had){
+    // allow removing only if no rounds
+    if ((s.rounds||[]).length>0) return toast("Nevar noņemt ierašanos, ja jau ir raundi. Palūdz adminam.");
+    s.attendees = s.attendees.filter(id=>id!==myPlayerId);
+  }
+
+  // recompute sessions count from scratch
+  recomputeAllStatsFromSessions();
+
+  // push full state? no (admin only). For self-mode, we push an event and let admin or everyone recompute via state.
+  // Simplest: allow self to write the whole state doc too, BUT limit what they can change by convention.
+  // Since rules are simple now, we enforce in UI: self only changes own attendance/GA, but the write is whole doc.
+  // We'll do a "patch" write of sessions/players. (Safer than full doc overwrite? We'll merge.)
+  await fb.setDoc(stateDoc(), {
+    sessions: state.sessions,
+    players: state.players,
+    updatedAt: fb.serverTimestamp()
+  }, { merge: true });
+
+  save(); renderAll();
+}
+
+async function selfAddGA(lastRoundId, type){
+  if (!onlineEnabled || !fb || !myPlayerId) return;
+  const s = getActiveSession();
+  if (!s) return toast("Nav aktīvas sesijas.");
+  const r = (s.rounds||[]).find(x=>x.id===lastRoundId);
+  if (!r) return toast("Nav pēdējā raunda.");
+
+  r.gaEvents = r.gaEvents || [];
+  r.gaEvents.push({ type, playerId: myPlayerId, byUid: myUid, ts: Date.now() });
+
+  recomputeAllStatsFromSessions();
+
+  await fb.setDoc(stateDoc(), {
+    sessions: state.sessions,
+    players: state.players,
+    updatedAt: fb.serverTimestamp()
+  }, { merge: true });
+
+  save(); renderAll();
+}
+
+async function selfUndoLastGA(lastRoundId){
+  if (!onlineEnabled || !fb || !myPlayerId) return;
+  const s = getActiveSession();
+  if (!s) return;
+  const r = (s.rounds||[]).find(x=>x.id===lastRoundId);
+  if (!r || !(r.gaEvents||[]).length) return;
+
+  // remove last GA event created by me for my player
+  for (let i=r.gaEvents.length-1;i>=0;i--){
+    const ev = r.gaEvents[i];
+    if (ev.playerId === myPlayerId){
+      r.gaEvents.splice(i,1);
+      break;
+    }
+  }
+
+  recomputeAllStatsFromSessions();
+
+  await fb.setDoc(stateDoc(), {
+    sessions: state.sessions,
+    players: state.players,
+    updatedAt: fb.serverTimestamp()
+  }, { merge: true });
+
+  save(); renderAll();
+}
 
   function uid() { return Math.random().toString(36).slice(2,10); }
   function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
