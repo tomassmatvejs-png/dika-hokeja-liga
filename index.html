@@ -664,6 +664,14 @@ async function selfUndoLastGA(lastRoundId){
         <div class="row" style="justify-content:space-between;">
           <div>
             <b>${escapeHtml(s.label)}</b> <span class="muted">(${fmtTs(s.ts)})</span><br/>
+            ${onlineEnabled ? `
+  <div style="margin-top:8px;">
+    ${isAdmin ? `<span class="pill ok">Admin</span>` : `<button id="becomeAdmin" class="btn-sm btn-primary">Iestatīt mani kā adminu</button>`}
+    <span class="pill">Mans profils: ${myPlayerId ? escapeHtml(nameOf(myPlayerId)) : "nav izvēlēts"}</span>
+    <button id="pickMe" class="btn-sm btn-ghost">Izvēlēties savu vārdu</button>
+  </div>
+` : ``}
+
             <span class="pill">Atnākuši: ${att}</span>
             <span class="pill">Raundi: ${rnd}</span>
             ${isActive ? `<span class="pill ok">Aktīva</span>` : ``}
