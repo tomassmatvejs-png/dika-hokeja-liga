@@ -1076,6 +1076,8 @@ alert("Profils piesaistīts ✅");
 
   // Global click handler (safe)
   document.body.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "pickMe") { e.preventDefault(); (async()=>{ await (window._pickMeHandler && window._pickMeHandler()); })(); return; }
+if (e.target && e.target.id === "becomeAdmin") { e.preventDefault(); (async()=>{ await (window._becomeAdminHandler && window._becomeAdminHandler()); })(); return; }
     const del = e.target?.getAttribute?.("data-del");
     if (del) deletePlayer(del);
 
