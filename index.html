@@ -475,6 +475,7 @@ async function selfUndoLastGA(lastRoundId){
 
     recomputeAllStatsFromSessions();
     save(); renderAll();
+    pushStateToCloud();
   }
 
   // --- Rounds / Teaming ---
