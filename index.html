@@ -605,6 +605,7 @@ async function selfUndoLastGA(lastRoundId){
     }
 
     save(); renderAll();
+    pushStateToCloud();
   }
 
   function deleteRound(roundId){
