@@ -1065,6 +1065,7 @@ async function selfUndoLastGA(lastRoundId){
       if (!p) return alert("Vārds nav atrasts.");
       myPlayerId = p.id;
       alert("Profils piesaistīts ✅");
+      localStorage.setItem("myPlayerId", myPlayerId);
       renderAll();
     };
   }
