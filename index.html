@@ -1065,10 +1065,10 @@ async function selfUndoLastGA(lastRoundId){
         x => x.name.toLowerCase() === chosen.trim().toLowerCase()
       );
       if (!p) return alert("Vārds nav atrasts.");
-      myPlayerId = p.id;
-      alert("Profils piesaistīts ✅");
-      localStorage.setItem("myPlayerId", myPlayerId);
-      renderAll();
+  myPlayerId = p.id;
+localStorage.setItem("myPlayerId", myPlayerId);
+renderAll();
+alert("Profils piesaistīts ✅");
     };
   }
 
