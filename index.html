@@ -176,8 +176,10 @@ let onlineReady = false;
 let myUid = null;
 
 let isAdmin = false;
-let myPlayerId = null;
-myPlayerId = localStorage.getItem("myPlayerId") || null;
+let myPlayerId = "";
+myPlayerId = localStorage.getItem("myPlayerId") || "";
+  const nameOf = (id) =>
+  state.players.find(p => p.id === id)?.name || "??";
 // kuru spēlētāju es esmu izvēlējies (self-mode)
 
 // Firestore ceļi (viena kopīga līga)
@@ -664,7 +666,6 @@ async function selfUndoLastGA(lastRoundId){
 
   // --- Rendering Active Session UI ---
   function renderSessionsList(){
-    const nameOf = (id) => state.players.find(p => p.id === id)?.name || "??";
     const sorted = state.sessions.slice().sort((a,b)=>b.ts-a.ts);
     el("sessionsList").innerHTML = sorted.map(s => {
       const isActive = s.id === state.activeSessionId;
