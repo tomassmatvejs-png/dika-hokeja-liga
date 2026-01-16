@@ -615,6 +615,7 @@ async function selfUndoLastGA(lastRoundId){
     s.rounds = (s.rounds||[]).filter(r => r.id !== roundId);
     recomputeAllStatsFromSessions();
     save(); renderAll();
+    pushStateToCloud();
   }
 
   function recomputeAllStatsFromSessions(){
