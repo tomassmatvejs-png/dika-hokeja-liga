@@ -240,8 +240,9 @@ async function initOnlineIfPossible(){
     // Subscribe: my profile
     fb.onSnapshot(uref, (snap)=>{
       const d = snap.data() || {};
-      myPlayerId = d.myPlayerId || null;
-      renderAll();
+      myPlayerId = d.myPlayerId || "";
+localStorage.setItem("myPlayerId", myPlayerId);
+renderAll();
     });
 
     // Subscribe: shared state
