@@ -1137,7 +1137,11 @@ async function selfUndoLastGA(lastRoundId){
 
   // Initial render
   renderAll();
-  initOnlineIfPossible();
+  (function waitForFirebase(){
+  if (window.firebaseCtx) { onlineEnabled = true; initOnlineIfPossible(); return; }
+  setTimeout(waitForFirebase, 200);
+})();
+
 </script>
 </body>
 </html>
