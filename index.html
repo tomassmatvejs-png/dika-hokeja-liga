@@ -923,24 +923,98 @@ async function selfUndoLastGA(lastRoundId){
   }
 
   function wireActiveSessionHandlers(){
-    // Attendance toggles
-    document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb=>{
-      cb.onchange = () => toggleAttendance(cb.getAttribute("data-att"), cb.checked);
-    });
+  // Attendance toggles
+  document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb=>{
+    cb.onchange = () => toggleAttendance(cb.getAttribute("data-att"), cb.checked);
+  });
 
-    // Auto teams
-    const autoBtn = document.getElementById("autoTeams");
-    if (autoBtn){
-      autoBtn.onclick = () => {
-        const s = getActiveSession();
-        if (!s) return;
-        if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
-        quickTeamsCache = makeTeams(s.attendees);
-        quickGA = [];
-        buildQuickTeamsUI(quickTeamsCache);
-      };
+  // Auto teams
+  const autoBtn = document.getElementById("autoTeams");
+  if (autoBtn){
+    autoBtn.onclick = () => {
+      const s = getActiveSession();
+      if (!s) return;
+      if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
+      quickTeamsCache = makeTeams(s.attendees);
+      quickGA = [];
+      buildQuickTeamsUI(quickTeamsCache);
+    };
+  }
+
+  // Save quick round
+  const saveQ = document.getElementById("saveQuickRound");
+  if (saveQ){
+    saveQ.onclick = () => {
+      const s = getActiveSession();
+      if (!s) return;
+      if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
+      const wi = Number(document.getElementById("q_winner").value);
+      const score = document.getElementById("q_score").value;
+      const notes = document.getElementById("q_notes").value;
+      addRound({teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes, gaEvents: quickGA});
+      document.getElementById("q_score").value = "";
+      document.getElementById("q_notes").value = "";
+      quickGA = [];
+      renderAll();
+    };
+  }
+
+  const clearGA = document.getElementById("clearGA");
+  if (clearGA){
+    clearGA.onclick = () => {
+      quickGA = [];
+      renderAll();
+    };
+  }
+
+  // Save manual round
+  const saveM = document.getElementById("saveManualRound");
+  if (saveM){
+    saveM.onclick = () => {
+      const s = getActiveSession();
+      if (!s) return;
+
+      const n = (s.attendees||[]).length;
+      if (n < 2) return alert("Atzīmē atnākušos.");
+
+      const split = suggestedSplit(n);
+      const teamCount = split.length;
+
+      const teams = [];
+      for (let t=0;t<teamCount;t++){
+        const size = split[t];
+        const ids = [];
+        for (let i=0;i<size;i++){
+          const v = document.getElementById(`m_${t}_${i}`).value;
+          if (v) ids.push(v);
+        }
+        if (ids.length !== size) return alert("Manuālajā raundā visām komandām jābūt pilnā sastāvā.");
+        teams.push(ids);
       }
-    }
+
+      const participants = teams.flat();
+      const uniq = new Set(participants);
+      if (uniq.size !== participants.length) return alert("Vienu un to pašu spēlētāju nevar ielikt 2 reizes.");
+
+      const wi = Number(document.getElementById("m_winner").value);
+      const score = document.getElementById("m_score").value;
+      const notes = document.getElementById("m_notes").value;
+
+      addRound({teams, winnerIndex: wi, scoreText: score, notes, gaEvents: []});
+      document.getElementById("m_score").value = "";
+      document.getElementById("m_notes").value = "";
+      renderAll();
+    };
+  }
+
+  // Delete round buttons
+  document.querySelectorAll("[data-delround]").forEach(btn=>{
+    btn.onclick = () => {
+      if (!confirm("Dzēst šo raundu?")) return;
+      deleteRound(btn.getAttribute("data-delround"));
+    };
+  });
+}
 // Pick my player (works for BOTH buttons)
 document.querySelectorAll('[data-pickme="1"]').forEach(btn => {
   btn.onclick = () => {
