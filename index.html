@@ -675,7 +675,8 @@ async function selfUndoLastGA(lastRoundId){
             ${onlineEnabled ? `
   <div style="margin-top:8px;">
     ${isAdmin ? `<span class="pill ok">Admin</span>` : `<button id="becomeAdmin" class="btn-sm btn-primary">Iestatīt mani kā adminu</button>`}
-    <span class="pill">Mans profils: ${myPlayerId ? escapeHtml(nameOf(myPlayerId)) : "nav izvēlēts"}</span>
+    <span class="pill">Mans profils: ${(localStorage.getItem("myPlayerId")) ? escapeHtml(nameOf(localStorage.getItem("myPlayerId"))) : "nav izvēlēts"}
+</span>
     <button id="pickMe" class="btn-sm btn-ghost">Izvēlēties savu vārdu</button>
   </div>
 ` : ``}
@@ -776,7 +777,8 @@ async function selfUndoLastGA(lastRoundId){
                 ? `<span class="pill ok">Admin</span>`
                 : `<button id="becomeAdmin" class="btn-sm btn-primary">Iestatīt mani kā adminu</button>`
               }
-              <span class="pill">Mans profils: ${myPlayerId ? escapeHtml(nameOf(myPlayerId)) : "nav izvēlēts"}</span>
+              <span class="pill">Mans profils: ${(localStorage.getItem("myPlayerId")) ? escapeHtml(nameOf(localStorage.getItem("myPlayerId"))) : "nav izvēlēts"}
+</span>
               <button id="pickMe" class="btn-sm btn-ghost">Izvēlēties savu vārdu</button>
             </div>
           ` : ``}
