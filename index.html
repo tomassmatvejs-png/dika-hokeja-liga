@@ -1017,25 +1017,6 @@ async function selfUndoLastGA(lastRoundId){
   });
 }
 // Pick my player (works for BOTH buttons)
-document.querySelectorAll('[data-pickme="1"]').forEach(btn => {
-  btn.onclick = () => {
-    if (!state.players.length) return alert("Nav spēlētāju.");
-    const names = state.players.map(p => p.name).join("\n");
-    const chosen = prompt("Ieraksti savu vārdu tieši kā sarakstā:\n\n" + names);
-    if (!chosen) return;
-
-    const p = state.players.find(x => x.name.toLowerCase() === chosen.trim().toLowerCase());
-    if (!p) return alert("Vārds nav atrasts.");
-
-    myPlayerId = p.id;
-    localStorage.setItem("myPlayerId", myPlayerId);
-
-    // extra safety: re-read (fixes “nav izvēlēts” bugs)
-    myPlayerId = localStorage.getItem("myPlayerId") || "";
-
-   renderAll();
-};
-});
   
   // Become admin
   const become = document.getElementById("becomeAdmin");
