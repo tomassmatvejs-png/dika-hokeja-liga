@@ -455,6 +455,7 @@ async function selfUndoLastGA(lastRoundId){
       if (p && p.sessions > 0) p.sessions -= 1;
     }
     save(); renderAll();
+    pushStateToCloud();
   }
 
   function deleteSession(sessionId){
