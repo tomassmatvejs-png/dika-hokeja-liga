@@ -1031,7 +1031,7 @@ async function selfUndoLastGA(lastRoundId){
       };
     });
       // --- Admin button ---
-  const become = document.getElementById("becomeAdmin");
+  const become = document.querySelector("#activeSessionBox #becomeAdmin");
   if (become) {
     become.onclick = async () => {
       if (!onlineEnabled || !fb) return alert("Online nav pieejams.");
@@ -1054,7 +1054,7 @@ async function selfUndoLastGA(lastRoundId){
   }
 
   // --- Pick my player ---
-  const pick = document.getElementById("pickMe");
+  const pick = document.querySelector("#activeSessionBox #pickMe");
   if (pick) {
     pick.onclick = async () => {
       if (!state.players.length) return alert("Nav spēlētāju.");
