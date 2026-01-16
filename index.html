@@ -377,6 +377,7 @@ async function selfUndoLastGA(lastRoundId){
   function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
   function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
   const el = (id) => document.getElementById(id);
+  const nameOf = (id) => state.players.find(p => p.id === id)?.name || "??";
 
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtTs(ts){ return new Date(ts).toLocaleString(); }
