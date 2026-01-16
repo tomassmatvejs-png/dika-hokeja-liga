@@ -693,197 +693,179 @@ async function selfUndoLastGA(lastRoundId){
   }
 
   function renderActiveSession(){
-    const s = getActiveSession();
-    if (!s){
-      el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
-      return;
-    }
+  const s = getActiveSession();
+  if (!s){
+    el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
+    return;
+  }
 
-    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
+  const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
+  const attendees = (s.attendees||[]).slice();
+  const n = attendees.length;
+  const split = suggestedSplit(n);
+  const splitText = split.length === 2 ? `${split[0]}v${split[1]}` : `${split[0]}v${split[1]}v${split[2]}`;
 
-    const attendees = (s.attendees||[]).slice();
-    const n = attendees.length;
-    const split = suggestedSplit(n);
-    const splitText = split.length === 2 ? `${split[0]}v${split[1]}` : `${split[0]}v${split[1]}v${split[2]}`;
+  // Attendance checklist
+  const checkList = state.players
+    .slice()
+    .sort((a,b)=>a.name.localeCompare(b.name,'lv'))
+    .map(p => {
+      const checked = s.attendees.includes(p.id);
+      return `<label class="pill" style="cursor:pointer;">
+        <input type="checkbox" data-att="${p.id}" ${checked ? "checked" : ""} /> ${escapeHtml(p.name)}
+      </label>`;
+    }).join(" ");
 
-    // Attendance checklist
-    const checkList = state.players
-      .slice()
-      .sort((a,b)=>a.name.localeCompare(b.name,'lv'))
-      .map(p => {
-        const checked = s.attendees.includes(p.id);
-        return `<label class="pill" style="cursor:pointer;">
-          <input type="checkbox" data-att="${p.id}" ${checked ? "checked" : ""} /> ${escapeHtml(p.name)}
-        </label>`;
-      }).join(" ");
-
-    // Rounds list
-    const rounds = (s.rounds||[]).slice().sort((a,b)=>b.ts-a.ts);
-    const roundsHtml = rounds.map(r => {
-      const teams = r.teams || [];
-      const teamLabels = teams.map((t,idx)=>{
-        const label = String.fromCharCode(65+idx); // A, B, C...
-        const players = t.map(nameOf).join(", ");
-        const win = (idx === r.winnerIndex) ? " 🏆" : "";
-        return `<div class="muted"><b>${label}${win}</b>: ${escapeHtml(players)}</div>`;
-      }).join("");
-      const ga = (r.gaEvents||[]).map(ev => `${ev.type}:${nameOf(ev.playerId)}`).join(", ");
-      return `<div class="card" style="margin:8px 0;">
-        <div class="row" style="justify-content:space-between;">
-          <div>
-            <b>${fmtTs(r.ts)}</b>
-            ${r.scoreText ? ` · <span class="pill">${escapeHtml(r.scoreText)}</span>` : ""}
-          </div>
-          <button class="btn-sm danger" data-delround="${r.id}">Dzēst raundu</button>
-        </div>
-        ${teamLabels}
-        ${r.notes ? `<div style="margin-top:6px;">📝 ${escapeHtml(r.notes)}</div>` : ``}
-        ${ga ? `<div class="muted" style="margin-top:6px;">G/A: ${escapeHtml(ga)}</div>` : ``}
-      </div>`;
-    }).join("") || `<span class="muted">Nav raundu. (Tas ir ok.)</span>`;
-
-    // Round creator UI
-    const attendeeOptions = attendees.map(id => `<option value="${id}">${escapeHtml(nameOf(id))}</option>`).join("");
-    const teamCount = split.length;
-
-    const makeSelect = (id) => `<select id="${id}"><option value="">—</option>${attendeeOptions}</select>`;
-
-    // manual team selectors based on suggested split
-    let manualTeamsHtml = "";
-    for (let t=0;t<teamCount;t++){
-      const size = split[t];
-      const label = String.fromCharCode(65+t);
-      manualTeamsHtml += `<div class="card" style="margin:0;">
-        <div><b>${label} komanda</b> <span class="muted">(${size})</span></div>
-        <div class="row" style="margin-top:6px;">${Array.from({length:size}).map((_,i)=>makeSelect(`m_${t}_${i}`)).join("")}</div>
-      </div>`;
-    }
-
-    const winnerOptions = Array.from({length:teamCount}).map((_,i)=>{
-      const label = String.fromCharCode(65+i);
-      return `<option value="${i}">${label}</option>`;
+  // Rounds list
+  const rounds = (s.rounds||[]).slice().sort((a,b)=>b.ts-a.ts);
+  const roundsHtml = rounds.map(r => {
+    const teams = r.teams || [];
+    const teamLabels = teams.map((t,idx)=>{
+      const label = String.fromCharCode(65+idx); // A, B, C...
+      const players = t.map(nameOf).join(", ");
+      const win = (idx === r.winnerIndex) ? " 🏆" : "";
+      return `<div class="muted"><b>${label}${win}</b>: ${escapeHtml(players)}</div>`;
     }).join("");
-
-    el("activeSessionBox").innerHTML = `
-      <div>
-        <div class="row" style="justify-content:space-between;">
-          <div>
-            <b>${escapeHtml(s.label)}</b> <span class="muted">(${fmtTs(s.ts)})</span><br/>
-            <span class="pill">Atnākuši: ${n}</span>
-            <span class="pill">Ieteiktais formāts: ${splitText}</span>
-          </div>
-          <div class="row">
-            <button id="autoTeams" class="btn-sm btn-primary">Auto komandas</button>
-          </div>
+    const ga = (r.gaEvents||[]).map(ev => `${ev.type}:${nameOf(ev.playerId)}`).join(", ");
+    return `<div class="card" style="margin:8px 0;">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <b>${fmtTs(r.ts)}</b>
+          ${r.scoreText ? ` · <span class="pill">${escapeHtml(r.scoreText)}</span>` : ""}
         </div>
+        ${isAdmin ? `<button class="btn-sm danger" data-delround="${r.id}">Dzēst raundu</button>` : ``}
+      </div>
+      ${teamLabels}
+      ${r.notes ? `<div style="margin-top:6px;">📝 ${escapeHtml(r.notes)}</div>` : ``}
+      ${ga ? `<div class="muted" style="margin-top:6px;">G/A: ${escapeHtml(ga)}</div>` : ``}
+    </div>`;
+  }).join("") || `<span class="muted">Nav raundu. (Tas ir ok.)</span>`;
 
-        <div class="card" style="margin:10px 0;">
-          <div><b>Atnākušie</b> <span class="muted">(atzīmē, kuri ir klāt — tas skaita sesijas)</span></div>
-          <div style="margin-top:8px;">${checkList}</div>
-          <div class="muted" style="margin-top:8px;">⚠️ Ja jau ir raundi, ierašanos noņemt nevar (lai nesajūk statistika).</div>
+  // Round creator UI
+  const attendeeOptions = attendees.map(id => `<option value="${id}">${escapeHtml(nameOf(id))}</option>`).join("");
+  const teamCount = split.length;
+  const makeSelect = (id) => `<select id="${id}"><option value="">—</option>${attendeeOptions}</select>`;
+
+  let manualTeamsHtml = "";
+  for (let t=0;t<teamCount;t++){
+    const size = split[t];
+    const label = String.fromCharCode(65+t);
+    manualTeamsHtml += `<div class="card" style="margin:0;">
+      <div><b>${label} komanda</b> <span class="muted">(${size})</span></div>
+      <div class="row" style="margin-top:6px;">${Array.from({length:size}).map((_,i)=>makeSelect(`m_${t}_${i}`)).join("")}</div>
+    </div>`;
+  }
+
+  const winnerOptions = Array.from({length:teamCount}).map((_,i)=>{
+    const label = String.fromCharCode(65+i);
+    return `<option value="${i}">${label}</option>`;
+  }).join("");
+
+  el("activeSessionBox").innerHTML = `
+    <div>
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <b>${escapeHtml(s.label)}</b> <span class="muted">(${fmtTs(s.ts)})</span><br/>
+          <span class="pill">Atnākuši: ${n}</span>
+          <span class="pill">Ieteiktais formāts: ${splitText}</span>
+
+          ${onlineEnabled ? `
+            <div style="margin-top:8px;">
+              ${isAdmin
+                ? `<span class="pill ok">Admin</span>`
+                : `<button id="becomeAdmin" class="btn-sm btn-primary">Iestatīt mani kā adminu</button>`
+              }
+              <span class="pill">Mans profils: ${myPlayerId ? escapeHtml(nameOf(myPlayerId)) : "nav izvēlēts"}</span>
+              <button id="pickMe" class="btn-sm btn-ghost">Izvēlēties savu vārdu</button>
+            </div>
+          ` : ``}
         </div>
-
-        <div class="card warn" style="margin:10px 0;">
-          <div class="row" style="justify-content:space-between;">
-            <div>
-              <b>Quick round</b> <span class="muted">(ātri: auto komandas → izvēlies uzvarētāju → saglabā)</span>
-            </div>
-          </div>
-
-          <div id="quickTeamsBox" class="muted" style="margin-top:8px;">
-            Spied <b>Auto komandas</b>, lai ģenerētu raundu.
-          </div>
-
-          <div class="row" style="margin-top:10px;">
-            <div>
-              <label>Uzvarētājs</label>
-              <select id="q_winner">${winnerOptions}</select>
-            </div>
-            <div>
-              <label>Rezultāts (pēc izvēles)</label>
-              <input id="q_score" placeholder="piem. 2-1-0 vai 3-2" />
-            </div>
-            <div style="flex:1; min-width:260px;">
-              <label>Piezīmes (pēc izvēles)</label>
-              <input id="q_notes" placeholder="piem. komandas mainījām pēc 5 min" style="width:100%;" />
-            </div>
-          </div>
-
-          <div class="card" style="margin-top:10px;">
-            <div><b>Goals / Assists</b> <span class="muted">(klikšķini pēc vajadzības; viss ir optional)</span></div>
-            <div id="gaBox" class="muted" style="margin-top:8px;">Nav auto komandās spēlētāju.</div>
-          </div>
-
-          <div class="row" style="margin-top:10px;">
-            <button id="saveQuickRound" class="btn-primary">Saglabāt raundu</button>
-            <button id="clearGA" class="btn-sm btn-ghost">Notīrīt G/A šim raundam</button>
-          </div>
-        </div>
-
-        <div class="card" style="margin:10px 0;">
-          <div><b>Manuāls raunds</b> <span class="muted">(ja gribi pats salikt komandas)</span></div>
-          <div class="grid grid-${teamCount}" style="margin-top:8px;">${manualTeamsHtml}</div>
-
-          <div class="row" style="margin-top:10px;">
-            <div>
-              <label>Uzvarētājs</label>
-              <select id="m_winner">${winnerOptions}</select>
-            </div>
-            <div>
-              <label>Rezultāts (pēc izvēles)</label>
-              <input id="m_score" placeholder="piem. 2-1-0 vai 3-2" />
-            </div>
-            <div style="flex:1; min-width:260px;">
-              <label>Piezīmes (pēc izvēles)</label>
-              <input id="m_notes" placeholder="piem. 4v4v3" style="width:100%;" />
-            </div>
-            <button id="saveManualRound" class="btn-primary">Saglabāt manuālu raundu</button>
-          </div>
-
-          <div class="muted" style="margin-top:6px;">
-            Padoms: manuālajā raundā izvēlies tieši <b>${n}</b> unikālus spēlētājus (bez dublikātiem).
-          </div>
-        </div>
-
-        <div class="card">
-          <div><b>Raundi šajā sesijā</b></div>
-          <div style="margin-top:8px;">${roundsHtml}</div>
+        <div class="row">
+          <button id="autoTeams" class="btn-sm btn-primary">Auto komandas</button>
+          ${isAdmin ? `<button class="btn-sm danger" data-delsession="${s.id}">Dzēst sesiju</button>` : ``}
         </div>
       </div>
-    `;
 
-    // Wire active session handlers
-    wireActiveSessionHandlers();
-      // Become admin (first come)
-  const become = document.getElementById("becomeAdmin");
-  if (become){
-    become.onclick = async () => {
-      const a = await fb.getDoc(adminDoc());
-      const d = a.data() || {};
-      if (d.adminUid && d.adminUid !== myUid){
-        return toast("Admins jau ir iestatīts.");
-      }
-      await fb.updateDoc(adminDoc(), { adminUid: myUid });
-      toast("Tu tagad esi admins ✅");
-    };
-  }
+      <div class="card" style="margin:10px 0;">
+        <div><b>Atnākušie</b> <span class="muted">(atzīmē, kuri ir klāt — tas skaita sesijas)</span></div>
+        <div style="margin-top:8px;">${checkList}</div>
+        <div class="muted" style="margin-top:8px;">⚠️ Ja jau ir raundi, ierašanos noņemt nevar (lai nesajūk statistika).</div>
+      </div>
 
-  // Pick my player
-  const pick = document.getElementById("pickMe");
-  if (pick){
-    pick.onclick = async () => {
-      if (!state.players.length) return toast("Nav spēlētāju saraksta.");
-      const names = state.players.map(p=>p.name).join("\n");
-      const chosen = prompt("Ieraksti savu vārdu tieši kā sarakstā:\n\n" + names);
-      if (!chosen) return;
-      const p = state.players.find(x => x.name.toLowerCase() === chosen.trim().toLowerCase());
-      if (!p) return toast("Neatradu tādu vārdu. Pārbaudi pareizrakstību.");
-      await selfSetMyPlayer(p.id);
-      toast("OK ✅");
-    };
-  }
+      <div class="card warn" style="margin:10px 0;">
+        <div><b>Quick round</b> <span class="muted">(ātri: auto komandas → izvēlies uzvarētāju → saglabā)</span></div>
 
-  }
+        <div id="quickTeamsBox" class="muted" style="margin-top:8px;">
+          Spied <b>Auto komandas</b>, lai ģenerētu raundu.
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label>Uzvarētājs</label>
+            <select id="q_winner">${winnerOptions}</select>
+          </div>
+          <div>
+            <label>Rezultāts (pēc izvēles)</label>
+            <input id="q_score" placeholder="piem. 2-1-0 vai 3-2" />
+          </div>
+          <div style="flex:1; min-width:260px;">
+            <label>Piezīmes (pēc izvēles)</label>
+            <input id="q_notes" placeholder="piem. komandas mainījām pēc 5 min" style="width:100%;" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:10px;">
+          <div><b>Goals / Assists</b> <span class="muted">(klikšķini pēc vajadzības; viss ir optional)</span></div>
+          <div id="gaBox" class="muted" style="margin-top:8px;">Nav auto komandās spēlētāju.</div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button id="saveQuickRound" class="btn-primary">Saglabāt raundu</button>
+          <button id="clearGA" class="btn-sm btn-ghost">Notīrīt G/A šim raundam</button>
+        </div>
+
+        ${(!isAdmin && onlineEnabled) ? `
+          <div class="muted" style="margin-top:10px;">
+            Spēlētājs režīms: izvēlies savu vārdu un tad vari sev pievienot G/A (nākamajā solī pieliksim “+G/+A/Undo” pogas tieši tev).
+          </div>
+        ` : ``}
+      </div>
+
+      <div class="card" style="margin:10px 0;">
+        <div><b>Manuāls raunds</b> <span class="muted">(ja gribi pats salikt komandas)</span></div>
+        <div class="grid grid-${teamCount}" style="margin-top:8px;">${manualTeamsHtml}</div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label>Uzvarētājs</label>
+            <select id="m_winner">${winnerOptions}</select>
+          </div>
+          <div>
+            <label>Rezultāts (pēc izvēles)</label>
+            <input id="m_score" placeholder="piem. 2-1-0 vai 3-2" />
+          </div>
+          <div style="flex:1; min-width:260px;">
+            <label>Piezīmes (pēc izvēles)</label>
+            <input id="m_notes" placeholder="piem. 4v4v3" style="width:100%;" />
+          </div>
+          <button id="saveManualRound" class="btn-primary">Saglabāt manuālu raundu</button>
+        </div>
+
+        <div class="muted" style="margin-top:6px;">
+          Padoms: manuālajā raundā izvēlies unikālus spēlētājus (bez dublikātiem).
+        </div>
+      </div>
+
+      <div class="card">
+        <div><b>Raundi šajā sesijā</b></div>
+        <div style="margin-top:8px;">${roundsHtml}</div>
+      </div>
+    </div>
+  `;
+
+  // Wire active session handlers
+  wireActiveSessionHandlers();
+}
 
   // --- Quick round state (UI-only) ---
   let quickTeamsCache = null; // array of arrays
