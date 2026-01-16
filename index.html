@@ -176,7 +176,9 @@ let onlineReady = false;
 let myUid = null;
 
 let isAdmin = false;
-let myPlayerId = null;        // kuru spēlētāju es esmu izvēlējies (self-mode)
+let myPlayerId = null; 
+  myPlayerId = localStorage.getItem("myPlayerId") || null;
+// kuru spēlētāju es esmu izvēlējies (self-mode)
 
 // Firestore ceļi (viena kopīga līga)
 function leagueDoc() { return fb.doc(fb.db, "leagues", LEAGUE_ID); }
