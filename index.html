@@ -178,7 +178,7 @@ let myUid = null;
 let isAdmin = false;
 let myPlayerId = "";
 myPlayerId = localStorage.getItem("myPlayerId") || "";
-  state.players.find(p => p.id === id)?.name || "??";
+const nameOf = (id) => state.players.find(p => p.id === id)?.name || "??";
 // kuru spēlētāju es esmu izvēlējies (self-mode)
 
 // Firestore ceļi (viena kopīga līga)
