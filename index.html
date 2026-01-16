@@ -178,7 +178,6 @@ let myUid = null;
 let isAdmin = false;
 let myPlayerId = "";
 myPlayerId = localStorage.getItem("myPlayerId") || "";
-  const nameOf = (id) =>
   state.players.find(p => p.id === id)?.name || "??";
 // kuru spēlētāju es esmu izvēlējies (self-mode)
 
@@ -379,8 +378,6 @@ async function selfUndoLastGA(lastRoundId){
   function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
   function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
   const el = (id) => document.getElementById(id);
-  const nameOf = (id) => state.players.find(p => p.id === id)?.name || "??";
-
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtTs(ts){ return new Date(ts).toLocaleString(); }
 
@@ -666,6 +663,7 @@ async function selfUndoLastGA(lastRoundId){
 
   // --- Rendering Active Session UI ---
   function renderSessionsList(){
+    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
     const sorted = state.sessions.slice().sort((a,b)=>b.ts-a.ts);
     el("sessionsList").innerHTML = sorted.map(s => {
       const isActive = s.id === state.activeSessionId;
@@ -703,7 +701,6 @@ async function selfUndoLastGA(lastRoundId){
     return;
   }
 
-  const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
   const attendees = (s.attendees||[]).slice();
   const n = attendees.length;
   const split = suggestedSplit(n);
@@ -876,7 +873,6 @@ async function selfUndoLastGA(lastRoundId){
   let quickGA = []; // events for current quick round
 
   function buildQuickTeamsUI(teams){
-    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
     const html = teams.map((t,idx)=>{
       const label = String.fromCharCode(65+idx);
       return `<div class="card" style="margin:6px 0;">
@@ -905,7 +901,6 @@ async function selfUndoLastGA(lastRoundId){
   }
 
   function renderQuickGASummary(){
-    const nameOf = (id) => state.players.find(p => p.id===id)?.name || "??";
     const g = quickGA.filter(e=>e.type==="G");
     const a = quickGA.filter(e=>e.type==="A");
     const sum = (arr) => arr.map(e=>nameOf(e.playerId)).join(", ");
