@@ -398,6 +398,7 @@ async function selfUndoLastGA(lastRoundId){
     if (playerUsed(id)) return alert("Nevar dzēst: spēlētājs jau ir sesijās/raundos. (Varam pievienot 'arhivēt'.)");
     state.players = state.players.filter(p => p.id !== id);
     save(); renderAll();
+    pushStateToCloud();
   }
 
   function renderPlayers() {
