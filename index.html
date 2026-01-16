@@ -1134,71 +1134,76 @@ document.querySelectorAll('[data-pickme="1"]').forEach(btn => {
     }
 
     // Delete round buttons
-    document.querySelectorAll("[data-delround]").forEach(btn=>{
-      btn.onclick = () => {
-        if (!confirm("Dzēst šo raundu?")) return;
-        deleteRound(btn.getAttribute("data-delround"));
-      };
-    });
+document.body.addEventListener("click", (e) => {
+  // Dzēst spēlētāju
+  const del = e.target?.getAttribute?.("data-del");
+  if (del) { deletePlayer(del); return; }
 
-  // Global click handler (safe)
-  document.body.addEventListener("click", (e) => {
-    // --- Pick my player (works everywhere) ---
-const pickBtn = e.target?.closest?.('[data-pickme="1"]');
-if (pickBtn) {
-  if (!state.players.length) return alert("Nav spēlētāju.");
-  const names = state.players.map(p => p.name).join("\n");
-  const chosen = prompt("Ieraksti savu vārdu tieši kā sarakstā:\n\n" + names);
-  if (!chosen) return;
-  const p = state.players.find(x => x.name.toLowerCase() === chosen.trim().toLowerCase());
-  if (!p) return alert("Vārds nav atrasts.");
-  myPlayerId = p.id;
-  localStorage.setItem("myPlayerId", myPlayerId);
-  renderAll();
-  return;
-}
+  // Atvērt sesiju
+  const setactive = e.target?.getAttribute?.("data-setactive");
+  if (setactive) { setActiveSession(setactive); return; }
 
-// --- Become admin (works everywhere) ---
-const adminBtn = e.target?.closest?.("#becomeAdmin");
-if (adminBtn) {
-  if (!onlineEnabled || !fb) return alert("Online nav pieejams.");
-  (async () => {
-    try {
-      const ref = adminDoc();
-      const snap = await fb.getDoc(ref);
-      const d = snap.data() || {};
-      if (d.adminUid && d.adminUid !== myUid) return alert("Admins jau ir iestatīts.");
-      await fb.setDoc(ref, { adminUid: myUid, createdAt: fb.serverTimestamp() }, { merge: true });
-      alert("Tu tagad esi admins ✅");
-      renderAll();
-    } catch (e) {
-      alert("Admin kļūda: " + e.message);
-    }
-  })();
-  return;
-}
-    if (e.target && e.target.id === "pickMe") { e.preventDefault(); (async()=>{ await (window._pickMeHandler && window._pickMeHandler()); })(); return; }
-if (e.target && e.target.id === "becomeAdmin") { e.preventDefault(); (async()=>{ await (window._becomeAdminHandler && window._becomeAdminHandler()); })(); return; }
-    const del = e.target?.getAttribute?.("data-del");
-    if (del) deletePlayer(del);
+  // Dzēst sesiju
+  const dels = e.target?.getAttribute?.("data-delsession");
+  if (dels){
+    if (!confirm("Dzēst sesiju? (Tiks pārrēķināta statistika.)")) return;
+    deleteSession(dels);
+    return;
+  }
 
-    const setactive = e.target?.getAttribute?.("data-setactive");
-    if (setactive) setActiveSession(setactive);
+  // Pick my player (strādā abām pogām)
+  const pickBtn = e.target?.closest?.('[data-pickme="1"]');
+  if (pickBtn){
+    if (!state.players.length) return alert("Nav spēlētāju.");
+    const names = state.players.map(p => p.name).join("\n");
+    const chosen = prompt("Ieraksti savu vārdu tieši kā sarakstā:\n\n" + names);
+    if (!chosen) return;
 
-    const dels = e.target?.getAttribute?.("data-delsession");
-    if (dels){
-      if (!confirm("Dzēst sesiju? (Tiks pārrēķināta statistika.)")) return;
-      deleteSession(dels);
+    const p = state.players.find(x => x.name.toLowerCase() === chosen.trim().toLowerCase());
+    if (!p) return alert("Vārds nav atrasts.");
+
+    myPlayerId = p.id;
+    localStorage.setItem("myPlayerId", myPlayerId);
+
+    // ONLINE: piesaista arī Firestore, citādi onSnapshot pēc brīža pārraksta atpakaļ uz null
+    if (onlineEnabled && fb && myUid){
+      selfSetMyPlayer(myPlayerId);
     }
 
-    const type = e.target?.getAttribute?.("data-ga");
-    const pid = e.target?.getAttribute?.("data-p");
-    if (type && pid){
-      if (!quickTeamsCache) return;
-      quickGA.push({type, playerId: pid});
-      renderQuickGASummary();
-    }
-  });
+    renderAll();
+    return;
+  }
+
+  // Become admin
+  const adminBtn = e.target?.closest?.("#becomeAdmin, #becomeAdminList");
+  if (adminBtn){
+    if (!onlineEnabled || !fb) return alert("Online nav pieejams.");
+    (async () => {
+      try {
+        const ref = adminDoc();
+        const snap = await fb.getDoc(ref);
+        const d = snap.data() || {};
+        if (d.adminUid && d.adminUid !== myUid) return alert("Admins jau ir iestatīts.");
+        await fb.setDoc(ref, { adminUid: myUid, createdAt: fb.serverTimestamp() }, { merge: true });
+        alert("Tu tagad esi admins ✅");
+        renderAll();
+      } catch (e) {
+        alert("Admin kļūda: " + e.message);
+      }
+    })();
+    return;
+  }
+
+  // GA (+G/+A)
+  const type = e.target?.getAttribute?.("data-ga");
+  const pid = e.target?.getAttribute?.("data-p");
+  if (type && pid){
+    if (!quickTeamsCache) return;
+    quickGA.push({type, playerId: pid});
+    renderQuickGASummary();
+    return;
+  }
+});
 
   // --- Table ---
   function renderTable() {
