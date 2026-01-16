@@ -171,7 +171,7 @@
 const fb = window.firebaseCtx || null;
 const LEAGUE_ID = window.LEAGUE_ID || "sals-liga";
 
-let onlineEnabled = !!fb;     // ja firebaseCtx ir, online var ieslēgt
+let onlineEnabled = !!window.firebaseCtx;     // ja firebaseCtx ir, online var ieslēgt
 let onlineReady = false;
 let myUid = null;
 
@@ -191,8 +191,7 @@ function toast(msg){
 
 // Ensure league exists + subscribe to shared state
 async function initOnlineIfPossible(){
-  if (!onlineEnabled) return;
-
+  if (!window.firebaseCtx) return;
   // Wait for auth
   try {
     const auth = fb.auth;
