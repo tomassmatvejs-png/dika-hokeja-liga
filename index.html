@@ -454,7 +454,7 @@ await fb.setDoc(stateDoc(), {
   }
   function ensureSessionGA(s, pid){
   s.sessionGA = s.sessionGA || {};
-  if (!s.sessionGA[pid]) s.sessionGA[pid] = { g: 0, a: 0 };
+  s.sessionGA[pid] = s.sessionGA[pid] || { g: 0, a: 0 };
   return s.sessionGA[pid];
 }
 
@@ -532,7 +532,7 @@ function renderSessionGASummary(){
     if (n === 7) return [4,3];
     if (n === 8) return [4,4];
     if (n === 9) return [3,3,3];
-    if (n === 10) return [5,5];
+    if (n === 10) return [4,3,3];
     if (n === 11) return [4,4,3];
     if (n === 12) return [4,4,4];
     // fallback: prefer 3 teams if >=9, else 2 teams
@@ -711,6 +711,15 @@ for (const [pid, ga] of Object.entries(sga)){
   p.g += Number(ga.g || 0);
   p.a += Number(ga.a || 0);
 }
+      // Session-level GA (krājam pa sesiju, nevis pa raundu)
+if (s.sessionGA){
+  for (const [pid, ga] of Object.entries(s.sessionGA)){
+    const p = state.players.find(x => x.id === pid);
+    if (!p) continue;
+    p.g += Number(ga.g || 0);
+    p.a += Number(ga.a || 0);
+  }
+}
     }
   }
 
@@ -881,8 +890,13 @@ quickTeamsCache = s.autoTeams || null;
 <div id="q_wld" class="row" style="gap:10px; flex-wrap:wrap;"></div>
           </div>
           <div>
-            <label>Rezultāts (pēc izvēles)</label>
-            <input id="q_score" placeholder="piem. 2-1-0 vai 3-2" />
+            const wldInputs = Array.from({length: teamCount}).map((_,i)=>{
+  const label = String.fromCharCode(65+i); // A,B,C
+  return `<div>
+    <label>${label} W-L-D</label>
+    <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
+  </div>`;
+}).join("");
           </div>
           <div style="flex:1; min-width:260px;">
             <label>Piezīmes (pēc izvēles)</label>
@@ -916,6 +930,9 @@ quickTeamsCache = s.autoTeams || null;
             <label>Uzvarētājs</label>
             <select id="m_winner">${winnerOptions}</select>
           </div>
+
+        ${wldInputs}
+
           <div>
             <label>Rezultāts (pēc izvēles)</label>
             <input id="m_score" placeholder="piem. 2-1-0 vai 3-2" />
@@ -1062,6 +1079,26 @@ if (wi === -1) {
 }
       const score = document.getElementById("q_score").value;
       const notes = document.getElementById("q_notes").value;
+      // --- W-L-D inputs pa komandām (A/B/C) ---
+const wld = [];
+for (let i=0;i<teamCount;i++){
+  const raw = (document.getElementById(`q_wld_${i}`)?.value || "").trim();
+  if (!raw) { wld.push({w:0,l:0,d:0}); continue; } // atļaujam tukšu = 0-0-0
+
+  const m = raw.match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)$/);
+  if (!m) return alert(`Nepareizs W-L-D formāts komandai ${String.fromCharCode(65+i)}. Piemērs: 5-4-2`);
+  wld.push({ w:+m[1], l:+m[2], d:+m[3] });
+}
+
+// garantējam storage sesijai
+s.teamWLD = s.teamWLD || Array.from({length: teamCount}).map(()=>({w:0,l:0,d:0}));
+
+// pieskaitām sesijas kopējam W-L-D
+for (let i=0;i<teamCount;i++){
+  s.teamWLD[i].w += wld[i].w;
+  s.teamWLD[i].l += wld[i].l;
+  s.teamWLD[i].d += wld[i].d;
+}
       addRound({ teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes });
       document.getElementById("q_score").value = "";
       document.getElementById("q_notes").value = "";
@@ -1265,6 +1302,8 @@ if (type && pid){
   const cell = ensureSessionGA(s, pid);
   if (type === "G") cell.g += 1;
   if (type === "A") cell.a += 1;
+  recomputeAllStatsFromSessions();
+renderTable();
 
   save();
   pushStateToCloud();
@@ -1423,17 +1462,15 @@ if (adminBtn) {
 let firebaseInited = false;
 
 // Firebase init: RUN ONCE (nevis ik pēc 200ms)
+let _fbInited = false;
 (function waitForFirebase(){
+  if (_fbInited) return;
   if (!window.firebaseCtx) return setTimeout(waitForFirebase, 200);
 
+  _fbInited = true;
   fb = window.firebaseCtx;
   onlineEnabled = true;
-
-  // drošībai: ja jau ieslēgts, neabonē vēlreiz
-  if (!window.__ONLINE_INIT_DONE__) {
-    window.__ONLINE_INIT_DONE__ = true;
-    initOnlineIfPossible();
-  }
+  initOnlineIfPossible();
 })();
 
 </script>
