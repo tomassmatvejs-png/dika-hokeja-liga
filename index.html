@@ -323,11 +323,14 @@ async function selfToggleAttendance(sessionId, present){
   // Simplest: allow self to write the whole state doc too, BUT limit what they can change by convention.
   // Since rules are simple now, we enforce in UI: self only changes own attendance/GA, but the write is whole doc.
   // We'll do a "patch" write of sessions/players. (Safer than full doc overwrite? We'll merge.)
-  await fb.setDoc(stateDoc(), {
-    sessions: state.sessions,
+await fb.setDoc(stateDoc(), {
+  payload: JSON.stringify({
     players: state.players,
-    updatedAt: fb.serverTimestamp()
-  }, { merge: true });
+    sessions: state.sessions,
+    activeSessionId: state.activeSessionId
+  }),
+  updatedAt: fb.serverTimestamp()
+}, { merge: true });
 
   save(); renderAll();
 }
