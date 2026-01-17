@@ -756,10 +756,17 @@ if (s.sessionGA){
   }
 
   function renderActiveSession(){
+    const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
+  const label = String.fromCharCode(65 + i); // A,B,C
+  return `
+    <div>
+      <label>${label} W-L-D</label>
+      <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
+    </div>
+  `;
+}).join("");
   const s = getActiveSession();
   if (!s){
-    // ja sesijai jau ir autoTeams, ieliec cache
-quickTeamsCache = s.autoTeams || null;
     el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
     // uztaisa W-L-D inputus katrai komandai quick roundam
 (function buildQuickWLD(){
@@ -782,7 +789,9 @@ quickTeamsCache = s.autoTeams || null;
 })();
     return;
   }
-
+    // ja sesijai jau ir autoTeams, ieliec cache
+quickTeamsCache = s.autoTeams || null;
+    
   const attendees = (s.attendees||[]).slice();
   const n = attendees.length;
   const split = suggestedSplit(n);
@@ -845,17 +854,6 @@ quickTeamsCache = s.autoTeams || null;
     const label = String.fromCharCode(65 + i);
     return `<option value="${i}">${label}</option>`;
   }).join("");
-
-// W-L-D inputi (A, B, C...) kā HTML string
-const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
-  const label = String.fromCharCode(65 + i); // A,B,C
-  return `
-    <div>
-      <label>${label} W-L-D</label>
-      <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
-    </div>
-  `;
-}).join("");
 
   el("activeSessionBox").innerHTML = `
     <div>
