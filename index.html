@@ -927,6 +927,8 @@ async function selfUndoLastGA(lastRoundId){
   function wireActiveSessionHandlers(){
 // Attendance toggles (FIX: allow clicking even with global click handler)
 document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb => {
+  cb.addEventListener("click", (e) => e.stopPropagation());
+
   cb.onclick = (ev) => {
     ev.stopPropagation(); // lai body click handler netraucē
 
