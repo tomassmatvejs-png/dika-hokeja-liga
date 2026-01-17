@@ -711,6 +711,8 @@ await fb.setDoc(stateDoc(), {
   function renderActiveSession(){
   const s = getActiveSession();
   if (!s){
+    // ja sesijai jau ir autoTeams, ieliec cache
+quickTeamsCache = s.autoTeams || null;
     el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
     return;
   }
@@ -880,6 +882,7 @@ await fb.setDoc(stateDoc(), {
 
   // Wire active session handlers
   wireActiveSessionHandlers();
+    if (quickTeamsCache) buildQuickTeamsUI(quickTeamsCache);
 }
 
   // --- Quick round state (UI-only) ---
@@ -961,13 +964,17 @@ if (onlineEnabled && !isAdmin) {
   const autoBtn = document.getElementById("autoTeams");
   if (autoBtn){
     autoBtn.onclick = () => {
-      const s = getActiveSession();
-      if (!s) return;
-      if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
-      quickTeamsCache = makeTeams(s.attendees);
-      quickGA = [];
-      buildQuickTeamsUI(quickTeamsCache);
-    };
+  const s = getActiveSession();
+  if (!s) return;
+  if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
+
+  s.autoTeams = makeTeams(s.attendees);   // <-- saglabā sesijā
+  quickTeamsCache = s.autoTeams;          // <-- UI cache
+  quickGA = [];
+  save();
+  pushStateToCloud();                     // ja admin
+  renderAll();                            // lai noteikti parādās
+};
   }
 
   // Save quick round
