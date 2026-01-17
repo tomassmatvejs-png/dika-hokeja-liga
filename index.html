@@ -283,9 +283,11 @@ async function pushStateToCloud(){
   if (!isAdmin) return;
 
   await fb.setDoc(stateDoc(), {
-    players: state.players,
-    sessions: state.sessions,
-    activeSessionId: state.activeSessionId,
+    payload: JSON.stringify({
+      players: state.players,
+      sessions: state.sessions,
+      activeSessionId: state.activeSessionId
+    }),
     updatedAt: fb.serverTimestamp()
   }, { merge: true });
 }
