@@ -756,38 +756,10 @@ if (s.sessionGA){
   }
 
   function renderActiveSession(){
-    const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
-  const label = String.fromCharCode(65 + i); // A,B,C
-  return `
-    <div>
-      <label>${label} W-L-D</label>
-      <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
-    </div>
-  `;
-}).join("");
+
   const s = getActiveSession();
   if (!s){
     el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
-    // uztaisa W-L-D inputus katrai komandai quick roundam
-(function buildQuickWLD(){
-  const box = document.getElementById("q_wld");
-  if (!box) return;
-
-  box.innerHTML = Array.from({length: teamCount}).map((_, i) => {
-    const label = String.fromCharCode(65+i);
-    return `
-      <div class="pill" style="display:flex; gap:6px; align-items:center;">
-        <b>${label}</b>
-        <input id="q_w_${i}" type="number" min="0" value="0" style="width:54px;" title="W" />
-        <span>-</span>
-        <input id="q_l_${i}" type="number" min="0" value="0" style="width:54px;" title="L" />
-        <span>-</span>
-        <input id="q_d_${i}" type="number" min="0" value="0" style="width:54px;" title="D" />
-      </div>
-    `;
-  }).join("");
-})();
-    return;
   }
     // ja sesijai jau ir autoTeams, ieliec cache
 quickTeamsCache = s.autoTeams || null;
@@ -795,6 +767,7 @@ quickTeamsCache = s.autoTeams || null;
   const attendees = (s.attendees||[]).slice();
   const n = attendees.length;
   const split = suggestedSplit(n);
+  const teamCount = split.length;
   const splitText = split.length === 2 ? `${split[0]}v${split[1]}` : `${split[0]}v${split[1]}v${split[2]}`;
 
   // Attendance checklist
@@ -835,7 +808,6 @@ quickTeamsCache = s.autoTeams || null;
 
   // Round creator UI
   const attendeeOptions = attendees.map(id => `<option value="${id}">${escapeHtml(nameOf(id))}</option>`).join("");
-  const teamCount = split.length;
   const makeSelect = (id) => `<select id="${id}"><option value="">—</option>${attendeeOptions}</select>`;
 
   let manualTeamsHtml = "";
