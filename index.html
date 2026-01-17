@@ -934,11 +934,11 @@ document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb => {
     const present = cb.checked;
 
     // online: ja neesi admins, tad self režīms; ja esi admins, tad parastais
-    if (onlineEnabled && !isAdmin) {
-      selfToggleAttendance(state.activeSessionId, present);
-    } else {
-      toggleAttendance(pid, present);
-    }
+if (onlineEnabled && !isAdmin) {
+  selfToggleAttendance(state.activeSessionId, present);
+} else {
+  toggleAttendance(pid, present);
+}
   };
 });
 
