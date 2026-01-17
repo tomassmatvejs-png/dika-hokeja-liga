@@ -1037,14 +1037,7 @@ async function selfUndoLastGA(lastRoundId){
     };
   }
     // GA buttons
-    document.body.addEventListener("click", (e) => {
-      const type = e.target?.getAttribute?.("data-ga");
-      const pid = e.target?.getAttribute?.("data-p");
-      if (!type || !pid) return;
-      if (!quickTeamsCache) return;
-      quickGA.push({type, playerId: pid});
-      renderQuickGASummary();
-    }, { once: true }); // we'll re-bind below properly in global handler
+     // we'll re-bind below properly in global handler
 
     // Save quick round
     const saveQ = document.getElementById("saveQuickRound");
@@ -1151,30 +1144,29 @@ document.body.addEventListener("click", (e) => {
     if (onlineEnabled && fb && myUid){
       selfSetMyPlayer(myPlayerId);
     }
-
+  }
     renderAll();
     return;
-  }
-
-  // Become admin
-  const adminBtn = e.target?.closest?.("#becomeAdmin, #becomeAdminList");
-  if (adminBtn){
-    if (!onlineEnabled || !fb) return alert("Online nav pieejams.");
-    (async () => {
-      try {
-        const ref = adminDoc();
-        const snap = await fb.getDoc(ref);
-        const d = snap.data() || {};
-        if (d.adminUid && d.adminUid !== myUid) return alert("Admins jau ir iestatīts.");
-        await fb.setDoc(ref, { adminUid: myUid, createdAt: fb.serverTimestamp() }, { merge: true });
-        alert("Tu tagad esi admins ✅");
-        renderAll();
-      } catch (e) {
-        alert("Admin kļūda: " + e.message);
-      }
-    })();
-    return;
-  }
+    
+    // Become admin (works everywhere)
+const adminBtn = e.target?.closest?.("#becomeAdmin, #becomeAdminList");
+if (adminBtn) {
+  if (!onlineEnabled || !fb) return alert("Online nav pieejams.");
+  (async () => {
+    try {
+      const ref = adminDoc();
+      const snap = await fb.getDoc(ref);
+      const d = snap.data() || {};
+      if (d.adminUid && d.adminUid !== myUid) return alert("Admins jau ir iestatīts.");
+      await fb.setDoc(ref, { adminUid: myUid, createdAt: fb.serverTimestamp() }, { merge: true });
+      alert("Tu tagad esi admins ✅");
+      renderAll();
+    } catch (e) {
+      alert("Admin kļūda: " + e.message);
+    }
+  })();
+  return;
+}
 
   // GA (+G/+A)
   const type = e.target?.getAttribute?.("data-ga");
