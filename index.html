@@ -845,6 +845,18 @@ quickTeamsCache = s.autoTeams || null;
     const label = String.fromCharCode(65 + i);
     return `<option value="${i}">${label}</option>`;
   }).join("");
+const teamCount = split.length;
+
+// W-L-D inputi (A, B, C...) kā HTML string
+const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
+  const label = String.fromCharCode(65 + i); // A,B,C
+  return `
+    <div>
+      <label>${label} W-L-D</label>
+      <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
+    </div>
+  `;
+}).join("");
 
   el("activeSessionBox").innerHTML = `
     <div>
@@ -887,16 +899,12 @@ quickTeamsCache = s.autoTeams || null;
         <div class="row" style="margin-top:10px;">
           <div>
             <label>Komandu bilance (W-L-D)</label>
-<div id="q_wld" class="row" style="gap:10px; flex-wrap:wrap;"></div>
+<div id="q_wld" class="row" style="gap:10px; flex-wrap:wrap;">
+  ${wldInputsHtml}
+</div>
           </div>
           <div>
-            const wldInputs = Array.from({length: teamCount}).map((_,i)=>{
-  const label = String.fromCharCode(65+i); // A,B,C
-  return `<div>
-    <label>${label} W-L-D</label>
-    <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
-  </div>`;
-}).join("");
+
           </div>
           <div style="flex:1; min-width:260px;">
             <label>Piezīmes (pēc izvēles)</label>
