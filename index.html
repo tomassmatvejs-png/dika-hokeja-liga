@@ -838,14 +838,15 @@ quickTeamsCache = s.autoTeams || null;
       <div class="row" style="margin-top:6px;">${Array.from({length:size}).map((_,i)=>makeSelect(`m_${t}_${i}`)).join("")}</div>
     </div>`;
   }
-
+    
+const teamCount = split.length;
+    
   const winnerOptions =
   `<option value="-1">Neizšķirts</option>` +
   Array.from({ length: teamCount }).map((_, i) => {
     const label = String.fromCharCode(65 + i);
     return `<option value="${i}">${label}</option>`;
   }).join("");
-const teamCount = split.length;
 
 // W-L-D inputi (A, B, C...) kā HTML string
 const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
