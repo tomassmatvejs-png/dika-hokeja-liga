@@ -1278,11 +1278,18 @@ if (adminBtn) {
 
   // Initial render
   renderAll();
-  (function waitForFirebase(){
- fb = window.firebaseCtx;
-    onlineEnabled = true;
-    initOnlineIfPossible();
-  setTimeout(waitForFirebase, 200);
+let firebaseInited = false;
+
+(function waitForFirebase(){
+  if (firebaseInited) return;
+  if (!window.firebaseCtx) {
+    setTimeout(waitForFirebase, 200);
+    return;
+  }
+  fb = window.firebaseCtx;
+  onlineEnabled = true;
+  firebaseInited = true;
+  initOnlineIfPossible();
 })();
 
 </script>
