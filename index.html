@@ -377,11 +377,14 @@ async function selfUndoLastGA(lastRoundId){
 
   recomputeAllStatsFromSessions();
 
-  await fb.setDoc(stateDoc(), {
-    sessions: state.sessions,
+await fb.setDoc(stateDoc(), {
+  payload: JSON.stringify({
     players: state.players,
-    updatedAt: fb.serverTimestamp()
-  }, { merge: true });
+    sessions: state.sessions,
+    activeSessionId: state.activeSessionId
+  }),
+  updatedAt: fb.serverTimestamp()
+}, { merge: true });
 
   save(); renderAll();
 }
