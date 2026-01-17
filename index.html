@@ -247,21 +247,23 @@ renderAll();
     });
 
     // Subscribe: shared state
-    fb.onSnapshot(stateDoc(), (snap)=>{
-      if (!snap.exists()) return;
-      const remote = snap.data();
-      if (!remote) return;
+fb.onSnapshot(stateDoc(), (snap)=>{
+  if (!snap.exists()) return;
+  const remote = snap.data() || {};
+  if (!remote.payload) return;
 
-      // Replace local state with remote state
-      // (Keeping only what we store)
-      state.players = remote.players || [];
-      state.sessions = remote.sessions || [];
-      state.activeSessionId = remote.activeSessionId || null;
+  let obj = null;
+  try { obj = JSON.parse(remote.payload); } catch { obj = null; }
+  if (!obj) return;
 
-      save(); // also keep local backup
-      onlineReady = true;
-      renderAll();
-    });
+  state.players = obj.players || [];
+  state.sessions = obj.sessions || [];
+  state.activeSessionId = obj.activeSessionId || null;
+
+  save();
+  onlineReady = true;
+  renderAll();
+});
 
     // If no state doc exists yet, seed from local or empty
     const s = await fb.getDoc(stateDoc());
