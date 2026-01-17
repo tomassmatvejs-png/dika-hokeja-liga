@@ -433,7 +433,8 @@ await fb.setDoc(stateDoc(), {
       ts: Date.now(),
       label: (label||"").trim() || "Hokeja sesija",
       attendees: [],
-      rounds: []
+      rounds: [],
+      
       autoTeams: null,     // fiksētas komandas šai sesijai
       teamWLD: null,       // [{w,l,d}, ...] tikpat cik komandu
     };
