@@ -1138,6 +1138,10 @@ if (onlineEnabled && !isAdmin) {
 
     // Delete round buttons
 document.body.addEventListener("click", (e) => {
+  // NEAIZTIEC form elementus (citādi pārzīmēšana/handleri var noraut fokusu)
+const t = e.target;
+const tag = t?.tagName;
+if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "OPTION") return;
   // Dzēst spēlētāju
   const del = e.target?.getAttribute?.("data-del");
   if (del) { deletePlayer(del); return; }
