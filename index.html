@@ -282,14 +282,14 @@ async function pushStateToCloud(){
   if (!onlineEnabled || !fb) return;
   if (!isAdmin) return;
 
-  await fb.setDoc(stateDoc(), {
-    payload: JSON.stringify({
-      players: state.players,
-      sessions: state.sessions,
-      activeSessionId: state.activeSessionId
-    }),
-    updatedAt: fb.serverTimestamp()
-  }, { merge: true });
+await fb.setDoc(stateDoc(), {
+  payload: JSON.stringify({
+    players: state.players,
+    sessions: state.sessions,
+    activeSessionId: state.activeSessionId
+  }),
+  updatedAt: fb.serverTimestamp()
+}, { merge: true });
 }
 
 // Lightweight “self” updates: attendance and GA events
