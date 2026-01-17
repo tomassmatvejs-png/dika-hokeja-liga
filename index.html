@@ -434,6 +434,8 @@ await fb.setDoc(stateDoc(), {
       label: (label||"").trim() || "Hokeja sesija",
       attendees: [],
       rounds: []
+      autoTeams: null,     // fiksētas komandas šai sesijai
+      teamWLD: null,       // [{w,l,d}, ...] tikpat cik komandu
     };
     state.sessions.push(s);
     state.activeSessionId = s.id;
@@ -773,8 +775,10 @@ quickTeamsCache = s.autoTeams || null;
     </div>`;
   }
 
-  const winnerOptions = Array.from({length:teamCount}).map((_,i)=>{
-    const label = String.fromCharCode(65+i);
+  const winnerOptions =
+  `<option value="-1">Neizšķirts</option>` +
+  Array.from({ length: teamCount }).map((_, i) => {
+    const label = String.fromCharCode(65 + i);
     return `<option value="${i}">${label}</option>`;
   }).join("");
 
@@ -882,6 +886,8 @@ quickTeamsCache = s.autoTeams || null;
 
   // Wire active session handlers
   wireActiveSessionHandlers();
+    // pēc rendera, ja sesijai ir autoTeams, parādām tās
+if (s.autoTeams) buildQuickTeamsUI(s.autoTeams);
     if (quickTeamsCache) buildQuickTeamsUI(quickTeamsCache);
 }
 
@@ -892,10 +898,16 @@ quickTeamsCache = s.autoTeams || null;
   function buildQuickTeamsUI(teams){
     const html = teams.map((t,idx)=>{
       const label = String.fromCharCode(65+idx);
-      return `<div class="card" style="margin:6px 0;">
-        <b>${label} komanda</b> <span class="muted">(${t.length})</span><br/>
-        ${t.map(id=>`<span class="pill">${escapeHtml(nameOf(id))}</span>`).join("")}
-      </div>`;
+     return `<div class="card" style="margin:6px 0;">
+  <b>${label} komanda</b>
+  ${(() => {
+    const s = getActiveSession();
+    const wld = s?.teamWLD?.[idx];
+    return wld ? ` <span class="pill">W-L-D: ${wld.w}-${wld.l}-${wld.d}</span>` : "";
+  })()}
+  <span class="muted">(${t.length})</span><br/>
+  ${t.map(id=>`<span class="pill">${escapeHtml(nameOf(id))}</span>`).join("")}
+</div>`;
     }).join("");
     el("quickTeamsBox").innerHTML = html || `<span class="muted">Nav komandu.</span>`;
 
@@ -968,12 +980,19 @@ if (onlineEnabled && !isAdmin) {
   if (!s) return;
   if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
 
-  s.autoTeams = makeTeams(s.attendees);   // <-- saglabā sesijā
-  quickTeamsCache = s.autoTeams;          // <-- UI cache
+  // 1) uzģenerē un FIKSĒ komandām šai sesijai
+  s.autoTeams = makeTeams(s.attendees);
+
+  // 2) uztaisa W-L-D tik komandām, cik ir (A/B/C...)
+  s.teamWLD = s.autoTeams.map(() => ({ w: 0, l: 0, d: 0 }));
+
+  // 3) UI cache
+  quickTeamsCache = s.autoTeams;
   quickGA = [];
+
   save();
-  pushStateToCloud();                     // ja admin
-  renderAll();                            // lai noteikti parādās
+  pushStateToCloud();     // ja tu esi admin, tas aizies uz firebase; ja ne, nekaitēs
+  renderAll();            // lai noteikti uzreiz parādās
 };
   }
 
@@ -985,6 +1004,22 @@ if (onlineEnabled && !isAdmin) {
       if (!s) return;
       if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
       const wi = Number(document.getElementById("q_winner").value);
+      // --- W/L/D update (sesijas komandām) ---
+if (!s.autoTeams || !s.teamWLD) {
+  return alert("Vispirms uzspied 'Auto komandas', lai fiksētu komandas šai sesijai.");
+}
+
+// ja kāds ir izdomājis quickTeamsCache citādāk, piespiežam izmantot sesijas komandas
+quickTeamsCache = s.autoTeams;
+
+if (wi === -1) {
+  // neizšķirts visām komandām
+  s.teamWLD.forEach(t => t.d++);
+} else {
+  // uzvara vienai komandai, pārējām zaudējums
+  s.teamWLD[wi].w++;
+  s.teamWLD.forEach((t, idx) => { if (idx !== wi) t.l++; });
+}
       const score = document.getElementById("q_score").value;
       const notes = document.getElementById("q_notes").value;
       addRound({teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes, gaEvents: quickGA});
