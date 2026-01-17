@@ -925,10 +925,22 @@ async function selfUndoLastGA(lastRoundId){
   }
 
   function wireActiveSessionHandlers(){
-  // Attendance toggles
-  document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb=>{
-    cb.onchange = () => toggleAttendance(cb.getAttribute("data-att"), cb.checked);
-  });
+// Attendance toggles (FIX: allow clicking even with global click handler)
+document.querySelectorAll('input[type="checkbox"][data-att]').forEach(cb => {
+  cb.onclick = (ev) => {
+    ev.stopPropagation(); // lai body click handler netraucē
+
+    const pid = cb.getAttribute("data-att");
+    const present = cb.checked;
+
+    // online: ja neesi admins, tad self režīms; ja esi admins, tad parastais
+    if (onlineEnabled && !isAdmin) {
+      selfToggleAttendance(state.activeSessionId, present);
+    } else {
+      toggleAttendance(pid, present);
+    }
+  };
+});
 
   // Auto teams
   const autoBtn = document.getElementById("autoTeams");
