@@ -885,9 +885,10 @@ function renderActiveSession(){
 <div id="q_wld" class="row" style="gap:10px; flex-wrap:wrap;">
   ${wldInputsHtml}
 </div>
-          </div>
-          <div>
-
+<div>
+  <label>Uzvarētājs</label>
+  <select id="q_winner">${winnerOptions}</select>
+</div>
           </div>
           <div style="flex:1; min-width:260px;">
             <label>Piezīmes (pēc izvēles)</label>
@@ -921,9 +922,6 @@ function renderActiveSession(){
             <label>Uzvarētājs</label>
             <select id="m_winner">${winnerOptions}</select>
           </div>
-
-        ${wldInputs}
-
           <div>
             <label>Rezultāts (pēc izvēles)</label>
             <input id="m_score" placeholder="piem. 2-1-0 vai 3-2" />
@@ -950,7 +948,6 @@ function renderActiveSession(){
   // Wire active session handlers
   wireActiveSessionHandlers();
     // pēc rendera, ja sesijai ir autoTeams, parādām tās
-if (s.autoTeams) buildQuickTeamsUI(s.autoTeams);
     if (quickTeamsCache) buildQuickTeamsUI(quickTeamsCache);
 }
 
