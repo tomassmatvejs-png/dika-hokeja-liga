@@ -755,20 +755,41 @@ if (s.sessionGA){
     }).join("") || `<span class="muted">Nav sesiju. Izveido pirmo.</span>`;
   }
 
-  function renderActiveSession(){
-
+function renderActiveSession(){
   const s = getActiveSession();
+ // W-L-D ievades lauki katrai komandai (Quick round)
+  const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
+    const label = String.fromCharCode(65 + i); // A,B,C
+    return `
+      <div>
+        <label>${label} W-L-D</label>
+        <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
+      </div>
+    `;
+  }).join("");  
   if (!s){
     el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
+    return;
   }
-    // ja sesijai jau ir autoTeams, ieliec cache
-quickTeamsCache = s.autoTeams || null;
-    
+
+  // cache: ja sesijai jau ir fiksētas auto komandas, ieliec UI cache
+  quickTeamsCache = s.autoTeams || null;
+
   const attendees = (s.attendees||[]).slice();
   const n = attendees.length;
   const split = suggestedSplit(n);
   const teamCount = split.length;
-  const splitText = split.length === 2 ? `${split[0]}v${split[1]}` : `${split[0]}v${split[1]}v${split[2]}`;
+
+  const splitText = split.length === 2
+    ? `${split[0]}v${split[1]}`
+    : `${split[0]}v${split[1]}v${split[2]}`;
+    // Winner options (A/B/C + Neizšķirts)
+  const winnerOptions =
+    `<option value="-1">Neizšķirts</option>` +
+    Array.from({ length: teamCount }).map((_, i) => {
+      const label = String.fromCharCode(65 + i); // A,B,C
+      return `<option value="${i}">${label}</option>`;
+    }).join("");
 
   // Attendance checklist
   const checkList = state.players
