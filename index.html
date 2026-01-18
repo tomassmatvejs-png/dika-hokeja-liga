@@ -757,16 +757,7 @@ if (s.sessionGA){
 
 function renderActiveSession(){
   const s = getActiveSession();
- // W-L-D ievades lauki katrai komandai (Quick round)
-  const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
-    const label = String.fromCharCode(65 + i); // A,B,C
-    return `
-      <div>
-        <label>${label} W-L-D</label>
-        <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
-      </div>
-    `;
-  }).join("");  
+  
   if (!s){
     el("activeSessionBox").innerHTML = `<span class="muted">Nav aktīvas sesijas. Izveido jaunu vai izvēlies no saraksta.</span>`;
     return;
@@ -779,6 +770,15 @@ function renderActiveSession(){
   const n = attendees.length;
   const split = suggestedSplit(n);
   const teamCount = split.length;
+  const wldInputsHtml = Array.from({ length: teamCount }).map((_, i) => {
+  const label = String.fromCharCode(65 + i); // A, B, C
+  return `
+    <div>
+      <label>${label} W-L-D</label>
+      <input id="q_wld_${i}" placeholder="piem. 5-4-2" />
+    </div>
+  `;
+}).join("");
 
   const splitText = split.length === 2
     ? `${split[0]}v${split[1]}`
@@ -840,13 +840,6 @@ function renderActiveSession(){
       <div class="row" style="margin-top:6px;">${Array.from({length:size}).map((_,i)=>makeSelect(`m_${t}_${i}`)).join("")}</div>
     </div>`;
   }
-    
-  const winnerOptions =
-  `<option value="-1">Neizšķirts</option>` +
-  Array.from({ length: teamCount }).map((_, i) => {
-    const label = String.fromCharCode(65 + i);
-    return `<option value="${i}">${label}</option>`;
-  }).join("");
 
   el("activeSessionBox").innerHTML = `
     <div>
