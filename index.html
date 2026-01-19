@@ -423,6 +423,42 @@ function winnerFromTeamWLD(teamWLD){
   if (winners.length !== 1) return -1;
   return winners[0];
 }
+  function normalizeTeams(teams){
+  if (!teams || !Array.isArray(teams)) return null;
+
+  const out = [];
+
+  for (const t of teams){
+    // 1) jau pareizais formāts: [id,id,id]
+    if (Array.isArray(t)){
+      out.push(t);
+      continue;
+    }
+
+    // 2) objekts ar ids/players/members
+    if (t && typeof t === "object"){
+      const cand =
+        (Array.isArray(t.ids) && t.ids) ||
+        (Array.isArray(t.players) && t.players) ||
+        (Array.isArray(t.members) && t.members) ||
+        (Array.isArray(t.team) && t.team) ||
+        null;
+
+      if (cand){
+        out.push(cand);
+        continue;
+      }
+    }
+
+    // 3) ja te nonāc – formāts nav saprotams
+    return null;
+  }
+
+  // pārliecināmies, ka katra komanda tiešām ir masīvs
+  if (!out.every(arr => Array.isArray(arr))) return null;
+
+  return out;
+}
   // --- Players ---
   function addPlayer(name) {
     name = (name||"").trim();
@@ -1143,9 +1179,9 @@ const normalizeTeams = (x) => {
   return null;
 };
 
-const teamsArr = normalizeTeams(quickTeamsCache);
+const teamsArr = normalizeTeams(teamsArr);
 if (!teamsArr) {
-  console.log("quickTeamsCache=", quickTeamsCache);
+  console.log("teamsArr=", teamsArr);
   return alert("Auto komandu formāts ir salūzis (skat. console). Spied 'Auto komandas' vēlreiz.");
 }
 // no šejienes tālāk izmanto teamsArr, nevis quickTeamsCache
@@ -1193,13 +1229,13 @@ teamsArr.forEach((teamArr, i) => {
     .map((x,i)=>`${String.fromCharCode(65+i)} ${x.w}-${x.l}-${x.d}`)
     .join(" | ");
 
-  // 3) saglabā round objektu
+// 3) saglabā round objektu
 addRound({
   teams: teamsArr,
   winnerIndex: wi,
-  teamWLD,
-  scoreText,
-  notes,
+  teamWLD: teamWLD,
+  scoreText: teamWLD.map((x,i)=>`${String.fromCharCode(65+i)} ${x.w}-${x.l}-${x.d}`).join(" | "),
+  notes: document.getElementById("q_notes")?.value || "",
   gaEvents: (quickGA || [])
 });
 
