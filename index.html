@@ -1153,9 +1153,9 @@ const ensureWLD = (pid) => {
   return p;
 };
 
-// teamWD[i] = { w,l,d } katrai komandai
+// teamWLD[i] = { w,l,d } katrai komandai
 quickTeamsCache.forEach((teamArr, i) => {
-  const wd = teamWD[i] || { w: 0, l: 0, d: 0 };
+  const wd = teamWLD[i] || { w: 0, l: 0, d: 0 };
   teamArr.forEach(pid => {
     const p = ensureWLD(pid);
     if (!p) return;
@@ -1229,7 +1229,7 @@ quickTeamsCache.forEach((teamArr, i) => {
       const score = document.getElementById("m_score").value;
       const notes = document.getElementById("m_notes").value;
 
-      addRound({ teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes });
+      addRound({ teams, winnerIndex: wi, scoreText: score, notes });
       document.getElementById("m_score").value = "";
       document.getElementById("m_notes").value = "";
       renderAll();
@@ -1265,56 +1265,7 @@ quickTeamsCache.forEach((teamArr, i) => {
     };
   }
     // GA buttons
-     // we'll re-bind below properly in global handler
-
-    // Save quick round
-    const saveQ = document.getElementById("saveQuickRound");
-    if (saveQ){
-      saveQ.onclick = () => {
-        const s = getActiveSession();
-        if (!s) return;
-        if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
-       // nolasa W-L-D katrai komandai
-const teamRes = Array.from({length: (quickTeamsCache?.length || 0)}).map((_, i) => {
-  const w = Number(document.getElementById(`q_w_${i}`)?.value || 0);
-  const l = Number(document.getElementById(`q_l_${i}`)?.value || 0);
-  const d = Number(document.getElementById(`q_d_${i}`)?.value || 0);
-  return { w, l, d };
-});
-
-// uzvarētāju nosaka pēc punktiem (W=2, D=1, L=0) — vari mainīt, ja gribi
-const points = teamRes.map(r => r.w*2 + r.d);
-let wi = 0;
-for (let i=1;i<points.length;i++){
-  if (points[i] > points[wi]) wi = i;
-}
-
-// score lauku vari lietot brīvajam tekstam (piem. “5-4-2 / 4-4-3 / 3-6-2”)
-const scoreEl = document.getElementById("q_score");
-const notesEl = document.getElementById("q_notes");
-const score = scoreEl ? scoreEl.value : "";
-const notes = notesEl ? notesEl.value : "";
-
-addRound({
-  teams: quickTeamsCache,
-  winnerIndex: wi,          // iekšēji vajag ELO/wins, bet tu UI vairs neizvēlies “vienu uzvarētāju”
-  scoreText: score,
-  notes,
-  gaEvents: quickGA,
-  teamRes               // <- šis ir JAUNS lauks
-});
-
-// pēc saglabāšanas notīrām
-document.getElementById("q_score").value = "";
-document.getElementById("q_notes").value = "";
-quickGA = [];
-renderAll();
-        document.getElementById("q_score").value = "";
-        document.getElementById("q_notes").value = "";
-        quickGA = [];
-        renderAll();
-      };
-    }
+     // we'll re-bind below properly in global handler    }
 
     const clearGA = document.getElementById("clearGA");
     if (clearGA){
