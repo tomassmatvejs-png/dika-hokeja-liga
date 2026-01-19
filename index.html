@@ -403,7 +403,26 @@ await fb.setDoc(stateDoc(), {
   function normTeams(teams){
   return (teams || []).map(t => Array.isArray(t) ? t : (t.members || []));
 }
+function parseWLD(str){
+  const s = String(str || "").trim();
+  const m = s.match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)$/);
+  if (!m) return null;
+  return { w: Number(m[1]), l: Number(m[2]), d: Number(m[3]) };
+}
 
+// Hockey punktu loģika: W=2, D=1, L=0 (vari mainīt uz W=3, D=1 ja gribi)
+function wldPoints(x){
+  return x.w * 2 + x.d * 1;
+}
+
+// Atgriež winnerIndex (0..n-1) vai -1 (ja neizšķirts / vienādi punkti)
+function winnerFromTeamWLD(teamWLD){
+  const pts = teamWLD.map(wldPoints);
+  const max = Math.max(...pts);
+  const winners = pts.map((p,i)=>p===max?i:-1).filter(i=>i>=0);
+  if (winners.length !== 1) return -1;
+  return winners[0];
+}
   // --- Players ---
   function addPlayer(name) {
     name = (name||"").trim();
@@ -715,6 +734,24 @@ function renderSessionGASummary(){
           if (i === r.winnerIndex) continue;
           eloUpdateTeamVsTeam(W, teamsArrays[i], 1, 0, 24);
         }
+        // round r
+if (r.teamWLD && Array.isArray(r.teamWLD) && Array.isArray(r.teams)){
+  r.teams.forEach((team, teamIdx) => {
+    const wld = r.teamWLD[teamIdx];
+    if (!wld) return;
+    team.forEach(pid => {
+      const st = stats[pid];
+      if (!st) return;
+      st.w += (wld.w || 0);
+      st.l += (wld.l || 0);
+      st.d += (wld.d || 0);
+      // ja tev kaut kur vajag kopējo "games":
+      st.games += (wld.w || 0) + (wld.l || 0) + (wld.d || 0);
+    });
+  });
+} else {
+  // vecā loģika (ja nav teamWLD) – atstāj kā bija
+}
       }
       // SESIJAS G/A (nevis raunda)
 const ga = s.sessionGA || {};
@@ -906,10 +943,6 @@ function renderActiveSession(){
 <div id="q_wld" class="row" style="gap:10px; flex-wrap:wrap;">
   ${wldInputsHtml}
 </div>
-<div>
-  <label>Uzvarētājs</label>
-  <select id="q_winner">${winnerOptions}</select>
-</div>
           </div>
           <div style="flex:1; min-width:260px;">
             <label>Piezīmes (pēc izvēles)</label>
@@ -1078,75 +1111,47 @@ autoBtn.onclick = () => {
   // Save quick round
   const saveQ = document.getElementById("saveQuickRound");
   if (saveQ){
-    saveQ.onclick = () => {
-      const s = getActiveSession();
-      if (!s) return;
-      if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
-      const wi = Number(document.getElementById("q_winner").value);
-      // --- W/L/D update (sesijas komandām) ---
-if (!s.autoTeams || !s.teamWLD) {
-  return alert("Vispirms uzspied 'Auto komandas', lai fiksētu komandas šai sesijai.");
-}
+saveQ.onclick = () => {
+  const s = getActiveSession();
+  if (!s) return;
 
-// ja kāds ir izdomājis quickTeamsCache citādāk, piespiežam izmantot sesijas komandas
-quickTeamsCache = s.autoTeams;
+  if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
 
-if (wi === -1) {
-  // neizšķirts visām komandām
-  s.teamWLD.forEach(t => t.d++);
-} else {
-  // uzvara vienai komandai, pārējām zaudējums
-  s.teamWLD[wi].w++;
-  s.teamWLD.forEach((t, idx) => { if (idx !== wi) t.l++; });
-}
-const scoreEl = document.getElementById("q_score");
-const notesEl = document.getElementById("q_notes");
-const score = scoreEl ? scoreEl.value : "";
-const notes = notesEl ? notesEl.value : "";
+  // 1) savāc W-L-D katrai komandai no inputiem q_wld_0, q_wld_1, ...
+  const teamCount = quickTeamsCache.length;
+  const teamWLD = [];
 
-      // --- W-L-D inputs pa komandām (A/B/C) ---
-const wld = [];
-for (let i=0;i<teamCount;i++){
-  const raw = (document.getElementById(`q_wld_${i}`)?.value || "").trim();
-  if (!raw) { wld.push({w:0,l:0,d:0}); continue; } // atļaujam tukšu = 0-0-0
+  for (let i = 0; i < teamCount; i++){
+    const inp = document.getElementById(`q_wld_${i}`);
+    const parsed = parseWLD(inp ? inp.value : "");
+    if (!parsed) return alert(`Komandai ${String.fromCharCode(65+i)} ievadi W-L-D formātā, piem. 4-0-0`);
+    teamWLD.push(parsed);
+  }
 
-  const m = raw.match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)$/);
-  if (!m) return alert(`Nepareizs W-L-D formāts komandai ${String.fromCharCode(65+i)}. Piemērs: 5-4-2`);
-  wld.push({ w:+m[1], l:+m[2], d:+m[3] });
-}
+  // 2) automātiski izrēķina uzvarētāju (vai -1 ja vienādi)
+  const wi = winnerFromTeamWLD(teamWLD);
 
-// garantējam storage sesijai
-s.teamWLD = s.teamWLD || Array.from({length: teamCount}).map(()=>({w:0,l:0,d:0}));
+  const notes = document.getElementById("q_notes")?.value || "";
 
-// pieskaitām sesijas kopējam W-L-D
-for (let i=0;i<teamCount;i++){
-  s.teamWLD[i].w += wld[i].w;
-  s.teamWLD[i].l += wld[i].l;
-  s.teamWLD[i].d += wld[i].d;
-}
-      // saglabā W-L-D sesijā no inputiem
-if (!s.teamWLD) {
-  const tc = (s.autoTeams ? s.autoTeams.length : (quickTeamsCache ? normTeams(quickTeamsCache).length : 0));
-  s.teamWLD = Array.from({length: tc}).map(()=>({w:0,l:0,d:0}));
-}
+  // (ja tev ir scoreText – vari saglabāt kā tekstu, bet mums galvenais ir teamWLD)
+  const scoreText = teamWLD
+    .map((x,i)=>`${String.fromCharCode(65+i)} ${x.w}-${x.l}-${x.d}`)
+    .join(" | ");
 
-for (let i=0; i<s.teamWLD.length; i++){
-  const inp = document.getElementById(`q_wld_${i}`);
-  if (!inp) continue;
-  const txt = (inp.value || "").trim();     // piem 5-4-2
-  const m = txt.match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)$/);
-  if (!m) continue;
-  s.teamWLD[i] = { w: +m[1], l: +m[2], d: +m[3] };
-}
-save();
-pushStateToCloud();
+  // 3) saglabā round objektu
+  addRound({
+    teams: quickTeamsCache,        // [ [playerId,...], [playerId,...], ... ]
+    winnerIndex: wi,               // auto
+    teamWLD: teamWLD,              // jaunais - galvenais!
+    scoreText: scoreText,
+    notes: notes,
+    gaEvents: (quickGA || [])
+  });
 
-      addRound({ teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes });
-      document.getElementById("q_score").value = "";
-      document.getElementById("q_notes").value = "";
-      quickGA = [];
-      renderAll();
-    };
+  // 4) notīra quickGA un pārrenderē
+  quickGA = [];
+  renderAll();
+};
   }
 
   const clearGA = document.getElementById("clearGA");
@@ -1434,7 +1439,7 @@ if (adminBtn) {
         <td>${i+1}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${p.sessions||0}</td>
-        <td>${p.games||0}</td>
+        <td>${st.w}-${st.l}-${st.d}</td>
         <td>${p.wins||0}</td>
         <td>${wp.toFixed(1)}%</td>
         <td class="mono">${Math.round(p.elo||1000)}</td>
