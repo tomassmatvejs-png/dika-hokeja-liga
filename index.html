@@ -428,11 +428,19 @@ function winnerFromTeamWLD(teamWLD){
     name = (name||"").trim();
     if (!name) return;
     if (state.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return alert("Šāds spēlētājs jau ir.");
-    state.players.push({ id: uid(), name, sessions: 0, games: 0, wins: 0, elo: 1000, g: 0, a: 0 
+    state.players.push({
+  id: uid(),
+  name,
+  sessions: 0,
+  games: 0,
+  wins: 0,
+  elo: 1000,
+  g: 0,
+  a: 0,
   w: 0,
   l: 0,
   d: 0,
-  });
+});
     save(); renderAll();
     pushStateToCloud();
   }
