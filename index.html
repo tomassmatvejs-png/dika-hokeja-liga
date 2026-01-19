@@ -192,6 +192,11 @@ function usersDoc(uid){ return fb.doc(fb.db, "leagues", LEAGUE_ID, "users", uid)
 function toast(msg){
   alert(msg);
 }
+  function ensureSessionGA(s, playerId){
+  s.sessionGA = s.sessionGA || {};
+  if (!s.sessionGA[playerId]) s.sessionGA[playerId] = { g: 0, a: 0 };
+  return s.sessionGA[playerId];
+}
 
 // Ensure league exists + subscribe to shared state
 async function initOnlineIfPossible(){
@@ -434,9 +439,9 @@ await fb.setDoc(stateDoc(), {
       label: (label||"").trim() || "Hokeja sesija",
       attendees: [],
       rounds: [],
-      sessionGA: {},   // { [playerId]: {g:0, a:0} } kopējais G/A sesijai
-      autoTeams: null,     // fiksētas komandas šai sesijai
-      teamWLD: null,       // [{w,l,d}, ...] tikpat cik komandu
+      autoTeams: null,        // [{members:[...]}]
+      teamWLD: null,          // [{w,l,d}, ...] tik cik komandu
+      sessionGA: {},          // { [playerId]: {g,a} }
     };
     state.sessions.push(s);
     state.activeSessionId = s.id;
@@ -572,6 +577,10 @@ function renderSessionGASummary(){
     }
     return teams; // array of arrays
   }
+  function normTeams(teams){
+  // atbalsta gan veco [[...],[...]] gan jauno [{members:[...]}]
+  return (teams || []).map(t => Array.isArray(t) ? t : (t.members || []));
+}
 
   function eloExpected(rA, rB){
     return 1 / (1 + Math.pow(10, (rB - rA)/400));
@@ -602,7 +611,8 @@ function renderSessionGASummary(){
     const s = getActiveSession();
     if (!s) return alert("Nav aktīvas sesijas.");
 
-    const participants = teams.flat();
+    const teamArrays = normTeams(teams);
+    const participants = teamArrays.flat();
     if (participants.length < 2) return alert("Par maz spēlētāju.");
     const uniq = new Set(participants);
     if (uniq.size !== participants.length) return alert("Vienā raundā spēlētājs nedrīkst būt 2 komandās.");
@@ -625,7 +635,7 @@ function renderSessionGASummary(){
       if (p) p.games += 1;
     }
     // wins+1 for winners
-    const winners = teams[winnerIndex] || [];
+    const winners = teamsArrays[winnerIndex] || [];
     for (const pid of winners){
       const p = state.players.find(x => x.id === pid);
       if (p) p.wins += 1;
@@ -644,10 +654,10 @@ function renderSessionGASummary(){
     // If 3 teams: winner beats both others (two matchups).
     // If >3 teams: treat winner vs each other (rare; still works).
     const K = 24;
-    const W = teams[winnerIndex] || [];
+    const W = teamsArrays[winnerIndex] || [];
     for (let i=0;i<teams.length;i++){
       if (i === winnerIndex) continue;
-      const L = teams[i];
+      const L = teamsArrays[i];
       // winner gets 1, loser gets 0
       eloUpdateTeamVsTeam(W, L, 1, 0, K);
     }
@@ -697,12 +707,20 @@ function renderSessionGASummary(){
           if (ev.type === "A") p.a += 1;
         }
         const teams = r.teams || [];
-        const W = teams[r.winnerIndex] || [];
+        const W = teamsArrays[r.winnerIndex] || [];
         for (let i=0;i<teams.length;i++){
           if (i === r.winnerIndex) continue;
-          eloUpdateTeamVsTeam(W, teams[i], 1, 0, 24);
+          eloUpdateTeamVsTeam(W, teamsArrays[i], 1, 0, 24);
         }
       }
+      // SESIJAS G/A (nevis raunda)
+const ga = s.sessionGA || {};
+for (const pid in ga){
+  const p = state.players.find(x => x.id === pid);
+  if (!p) continue;
+  p.g += (ga[pid].g || 0);
+  p.a += (ga[pid].a || 0);
+}
       // Sesijas kopējais G/A
 const sga = s.sessionGA || {};
 for (const [pid, ga] of Object.entries(sga)){
@@ -805,7 +823,7 @@ function renderActiveSession(){
   // Rounds list
   const rounds = (s.rounds||[]).slice().sort((a,b)=>b.ts-a.ts);
   const roundsHtml = rounds.map(r => {
-    const teams = r.teams || [];
+    const teams = normTeams(r.teams);
     const teamLabels = teams.map((t,idx)=>{
       const label = String.fromCharCode(65+idx); // A, B, C...
       const players = t.map(nameOf).join(", ");
@@ -1020,24 +1038,26 @@ if (onlineEnabled && !isAdmin) {
   // Auto teams
   const autoBtn = document.getElementById("autoTeams");
   if (autoBtn){
-    autoBtn.onclick = () => {
+autoBtn.onclick = () => {
   const s = getActiveSession();
   if (!s) return;
   if ((s.attendees||[]).length < 2) return alert("Atzīmē vismaz 2 atnākušos.");
 
-  // 1) uzģenerē un FIKSĒ komandām šai sesijai
-  s.autoTeams = makeTeams(s.attendees);
+  // 1) ģenerē komandas un saglabā sesijā (NEKAD nested arrays)
+  const arr = makeTeams(s.attendees); // [[...],[...]]
+  s.autoTeams = arr.map(members => ({ members }));
 
-  // 2) uztaisa W-L-D tik komandām, cik ir (A/B/C...)
-  s.teamWLD = s.autoTeams.map(() => ({ w: 0, l: 0, d: 0 }));
+  // 2) izveido W-L-D tik komandām cik ir
+  const teamCount = s.autoTeams.length;
+  s.teamWLD = Array.from({length: teamCount}).map(()=>({w:0,l:0,d:0}));
 
   // 3) UI cache
   quickTeamsCache = s.autoTeams;
   quickGA = [];
 
   save();
-  pushStateToCloud();     // ja tu esi admin, tas aizies uz firebase; ja ne, nekaitēs
-  renderAll();            // lai noteikti uzreiz parādās
+  pushStateToCloud();
+  renderAll();
 };
   }
 
@@ -1087,6 +1107,23 @@ for (let i=0;i<teamCount;i++){
   s.teamWLD[i].l += wld[i].l;
   s.teamWLD[i].d += wld[i].d;
 }
+      // saglabā W-L-D sesijā no inputiem
+if (!s.teamWLD) {
+  const tc = (s.autoTeams ? s.autoTeams.length : (quickTeamsCache ? normTeams(quickTeamsCache).length : 0));
+  s.teamWLD = Array.from({length: tc}).map(()=>({w:0,l:0,d:0}));
+}
+
+for (let i=0; i<s.teamWLD.length; i++){
+  const inp = document.getElementById(`q_wld_${i}`);
+  if (!inp) continue;
+  const txt = (inp.value || "").trim();     // piem 5-4-2
+  const m = txt.match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)$/);
+  if (!m) continue;
+  s.teamWLD[i] = { w: +m[1], l: +m[2], d: +m[3] };
+}
+save();
+pushStateToCloud();
+
       addRound({ teams: quickTeamsCache, winnerIndex: wi, scoreText: score, notes });
       document.getElementById("q_score").value = "";
       document.getElementById("q_notes").value = "";
@@ -1275,10 +1312,9 @@ renderAll();
 document.body.addEventListener("click", (e) => {
 
 ;
-// --- GA (+G/+A) quick round: krājam sesijā ---
-const gaBtn = e.target?.closest?.("[data-ga][data-p]");
-const type = gaBtn?.getAttribute("data-ga");
-const pid  = gaBtn?.getAttribute("data-p");
+// --- GA (+G/+A) quick round: krājam SESIJĀ ---
+const type = e.target?.getAttribute?.("data-ga");
+const pid  = e.target?.getAttribute?.("data-p");
 if (type && pid){
   e.preventDefault();
   e.stopPropagation();
@@ -1290,15 +1326,14 @@ if (type && pid){
   const cell = ensureSessionGA(s, pid);
   if (type === "G") cell.g += 1;
   if (type === "A") cell.a += 1;
-  recomputeAllStatsFromSessions();
-renderTable();
 
   save();
   pushStateToCloud();
 
-  renderSessionGASummary(); // atjauno tikai rindiņu
+  // tikai atjauno rindiņu (ne renderAll!)
+  renderSessionGASummary?.();
   return;
-} 
+}
   
   // NEAIZTIEC form elementus (citādi pārzīmēšana/handleri var noraut fokusu)
   const t = e.target;
