@@ -400,6 +400,9 @@ await fb.setDoc(stateDoc(), {
   const el = (id) => document.getElementById(id);
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function fmtTs(ts){ return new Date(ts).toLocaleString(); }
+  function normTeams(teams){
+  return (teams || []).map(t => Array.isArray(t) ? t : (t.members || []));
+}
 
   // --- Players ---
   function addPlayer(name) {
@@ -973,47 +976,58 @@ function renderActiveSession(){
   let quickTeamsCache = null; // array of arrays
 // quickGA vairs nelietojam — G/A krājam sesijā
 
-  function buildQuickTeamsUI(teams){
-    const html = teams.map((t,idx)=>{
-      const label = String.fromCharCode(65+idx);
-     return `<div class="card" style="margin:6px 0;">
-  <b>${label} komanda</b>
-  ${(() => {
-    const s = getActiveSession();
-    const wld = s?.teamWLD?.[idx];
-    return wld ? ` <span class="pill">W-L-D: ${wld.w}-${wld.l}-${wld.d}</span>` : "";
-  })()}
-  <span class="muted">(${t.length})</span><br/>
-  ${t.map(id=>`<span class="pill">${escapeHtml(nameOf(id))}</span>`).join("")}
-</div>`;
-    }).join("");
-    el("quickTeamsBox").innerHTML = html || `<span class="muted">Nav komandu.</span>`;
+function buildQuickTeamsUI(teams){
+  const s = getActiveSession();
+  const teamArrays = normTeams(teams); // vienmēr [[id,id],[id,id],...]
 
-    // GA buttons
-    const players = teams.flat();
-    if (players.length === 0){
-      el("gaBox").innerHTML = `<span class="muted">Nav auto komandās spēlētāju.</span>`;
-      return;
+  // Komandu kartītes
+  const html = teamArrays.map((t, idx) => {
+    const label = String.fromCharCode(65 + idx); // A,B,C...
+    const size = t.length;
+
+    // W-L-D no sesijas, ja ir
+    let wldTxt = "";
+    if (s && Array.isArray(s.teamWLD) && s.teamWLD[idx]) {
+      const w = s.teamWLD[idx].w || 0;
+      const l = s.teamWLD[idx].l || 0;
+      const d = s.teamWLD[idx].d || 0;
+      wldTxt = ` <span class="pill">${w}-${l}-${d}</span>`;
     }
-    el("gaBox").innerHTML = players.map(pid=>{
-      const nm = escapeHtml(nameOf(pid));
-      return `<span class="pill">
-        ${nm}
-        <button class="btn-sm btn-ghost" data-ga="G" data-p="${pid}">+G</button>
-        <button class="btn-sm btn-ghost" data-ga="A" data-p="${pid}">+A</button>
-      </span>`;
-    }).join(" ");
-    // Sesijas G/A rindiņa virs pogām
-let sum = document.getElementById("gaSummary");
-if (!sum){
-  sum = document.createElement("div");
-  sum.id = "gaSummary";
-  sum.className = "muted";
-  sum.style.marginBottom = "8px";
-  el("gaBox").parentElement.insertBefore(sum, el("gaBox"));
-}
-renderSessionGASummary();
+
+    const pills = t.map(pid => {
+      const nm = state.players.find(p => p.id === pid)?.name || "??";
+      return `<span class="pill">${escapeHtml(nm)}</span>`;
+    }).join("");
+
+    return `<div class="card" style="margin-top:8px;">
+      <div><b>${label} komanda</b> <span class="muted">(${size})</span>${wldTxt}</div>
+      <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${pills}</div>
+    </div>`;
+  }).join("");
+
+  el("quickTeamsBox").innerHTML = html || `<span class="muted">Nav komandu.</span>`;
+
+  // GA pogas (sesijas GA)
+  const players = teamArrays.flat();
+  if (players.length === 0){
+    el("gaBox").innerHTML = `<span class="muted">Nav auto komandās spēlētāju.</span>`;
+    return;
   }
+
+  el("gaBox").innerHTML = players.map(pid => {
+    const nm = state.players.find(p => p.id === pid)?.name || "??";
+    const cell = (s && s.sessionGA && s.sessionGA[pid]) ? s.sessionGA[pid] : { g:0, a:0 };
+    const g = cell.g || 0;
+    const a = cell.a || 0;
+
+    return `<span class="pill" style="display:inline-flex; gap:6px; align-items:center;">
+      ${escapeHtml(nm)}
+      <button class="btn-sm btn-ghost" data-ga="G" data-p="${pid}">+G</button>
+      <button class="btn-sm btn-ghost" data-ga="A" data-p="${pid}">+A</button>
+      <span class="muted">${g}/${a}</span>
+    </span>`;
+  }).join(" ");
+}
 
   function wireActiveSessionHandlers(){
 // Attendance toggles (FIX: allow clicking even with global click handler)
@@ -1085,8 +1099,11 @@ if (wi === -1) {
   s.teamWLD[wi].w++;
   s.teamWLD.forEach((t, idx) => { if (idx !== wi) t.l++; });
 }
-      const score = document.getElementById("q_score").value;
-      const notes = document.getElementById("q_notes").value;
+const scoreEl = document.getElementById("q_score");
+const notesEl = document.getElementById("q_notes");
+const score = scoreEl ? scoreEl.value : "";
+const notes = notesEl ? notesEl.value : "";
+
       // --- W-L-D inputs pa komandām (A/B/C) ---
 const wld = [];
 for (let i=0;i<teamCount;i++){
@@ -1234,8 +1251,10 @@ for (let i=1;i<points.length;i++){
 }
 
 // score lauku vari lietot brīvajam tekstam (piem. “5-4-2 / 4-4-3 / 3-6-2”)
-const score = document.getElementById("q_score").value;
-const notes = document.getElementById("q_notes").value;
+const scoreEl = document.getElementById("q_score");
+const notesEl = document.getElementById("q_notes");
+const score = scoreEl ? scoreEl.value : "";
+const notes = notesEl ? notesEl.value : "";
 
 addRound({
   teams: quickTeamsCache,
