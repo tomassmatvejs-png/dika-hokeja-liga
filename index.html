@@ -1179,10 +1179,10 @@ const normalizeTeams = (x) => {
   return null;
 };
 
-const teamsArr = normalizeTeams(teamsArr);
+const teamsArr = normalizeTeams(quickTeamsCache);
 if (!teamsArr) {
-  console.log("teamsArr=", teamsArr);
-  return alert("Auto komandu formāts ir salūzis (skat. console). Spied 'Auto komandas' vēlreiz.");
+  console.log("quickTeamsCache=", quickTeamsCache);
+  return alert("Auto komandu formāts ir salūzis (skati console). Spied 'Auto komandas' vēlreiz.");
 }
 // no šejienes tālāk izmanto teamsArr, nevis quickTeamsCache
 
