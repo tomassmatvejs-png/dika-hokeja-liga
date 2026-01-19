@@ -428,7 +428,11 @@ function winnerFromTeamWLD(teamWLD){
     name = (name||"").trim();
     if (!name) return;
     if (state.players.some(p => p.name.toLowerCase() === name.toLowerCase())) return alert("Šāds spēlētājs jau ir.");
-    state.players.push({ id: uid(), name, sessions: 0, games: 0, wins: 0, elo: 1000, g: 0, a: 0 });
+    state.players.push({ id: uid(), name, sessions: 0, games: 0, wins: 0, elo: 1000, g: 0, a: 0 
+  w: 0,
+  l: 0,
+  d: 0,
+  });
     save(); renderAll();
     pushStateToCloud();
   }
@@ -1130,6 +1134,28 @@ saveQ.onclick = () => {
 
   // 2) automātiski izrēķina uzvarētāju (vai -1 ja vienādi)
   const wi = winnerFromTeamWLD(teamWLD);
+// 2.5) pieskaita W/L/D katram spēlētājam pēc komandas bilances
+// (W/L/D ir "sesijas bilance", un games/wins var atstāt ELO loģikai atsevišķi)
+const ensureWLD = (pid) => {
+  const p = state.players.find(x => x.id === pid);
+  if (!p) return null;
+  if (p.w == null) p.w = 0;
+  if (p.l == null) p.l = 0;
+  if (p.d == null) p.d = 0;
+  return p;
+};
+
+// teamWD[i] = { w,l,d } katrai komandai
+quickTeamsCache.forEach((teamArr, i) => {
+  const wd = teamWD[i] || { w: 0, l: 0, d: 0 };
+  teamArr.forEach(pid => {
+    const p = ensureWLD(pid);
+    if (!p) return;
+    p.w += (wd.w || 0);
+    p.l += (wd.l || 0);
+    p.d += (wd.d || 0);
+  });
+});
 
   const notes = document.getElementById("q_notes")?.value || "";
 
@@ -1433,13 +1459,18 @@ if (adminBtn) {
     });
 
     const rows = sorted.map((p,i) => {
+      state.players.forEach(p => {
+  if (p.w == null) p.w = 0;
+  if (p.l == null) p.l = 0;
+  if (p.d == null) p.d = 0;
+});
       const wp = p.games ? (100*p.wins/p.games) : 0;
       const pts = (p.g||0) + (p.a||0);
       return `<tr>
         <td>${i+1}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${p.sessions||0}</td>
-        <td>${st.w}-${st.l}-${st.d}</td>
+        <td>${(p.w||0)}-${(p.l||0)}-${(p.d||0)}</td>
         <td>${p.wins||0}</td>
         <td>${wp.toFixed(1)}%</td>
         <td class="mono">${Math.round(p.elo||1000)}</td>
