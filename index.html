@@ -1128,9 +1128,30 @@ saveQ.onclick = () => {
   if (!s) return;
 
   if (!quickTeamsCache) return alert("Vispirms spied 'Auto komandas'.");
+  // --- normalize quickTeamsCache to array-of-arrays (playerId[][]) ---
+const normalizeTeams = (x) => {
+  // ja jau ir pareizi: [ [id,id], [id,id], ... ]
+  if (Array.isArray(x) && x.every(t => Array.isArray(t))) return x;
+
+  // ja gadījumā ir objekts {A:[...],B:[...],C:[...]} -> pārvēršam masīvā
+  if (x && typeof x === "object") {
+    const keys = Object.keys(x).sort(); // A,B,C...
+    const arr = keys.map(k => x[k]).filter(v => Array.isArray(v));
+    if (arr.length) return arr;
+  }
+
+  return null;
+};
+
+const teamsArr = normalizeTeams(quickTeamsCache);
+if (!teamsArr) {
+  console.log("quickTeamsCache=", quickTeamsCache);
+  return alert("Auto komandu formāts ir salūzis (skat. console). Spied 'Auto komandas' vēlreiz.");
+}
+// no šejienes tālāk izmanto teamsArr, nevis quickTeamsCache
 
   // 1) savāc W-L-D katrai komandai no inputiem q_wld_0, q_wld_1, ...
-  const teamCount = quickTeamsCache.length;
+  const teamCount = teamsArr.length;
   const teamWLD = [];
 
   for (let i = 0; i < teamCount; i++){
@@ -1154,7 +1175,7 @@ const ensureWLD = (pid) => {
 };
 
 // teamWLD[i] = { w,l,d } katrai komandai
-quickTeamsCache.forEach((teamArr, i) => {
+teamsArr.forEach((teamArr, i) => {
   const wd = teamWLD[i] || { w: 0, l: 0, d: 0 };
   teamArr.forEach(pid => {
     const p = ensureWLD(pid);
@@ -1173,14 +1194,14 @@ quickTeamsCache.forEach((teamArr, i) => {
     .join(" | ");
 
   // 3) saglabā round objektu
-  addRound({
-    teams: quickTeamsCache,        // [ [playerId,...], [playerId,...], ... ]
-    winnerIndex: wi,               // auto
-    teamWLD: teamWLD,              // jaunais - galvenais!
-    scoreText: scoreText,
-    notes: notes,
-    gaEvents: (quickGA || [])
-  });
+addRound({
+  teams: teamsArr,
+  winnerIndex: wi,
+  teamWLD,
+  scoreText,
+  notes,
+  gaEvents: (quickGA || [])
+});
 
   // 4) notīra quickGA un pārrenderē
   quickGA = [];
@@ -1207,7 +1228,7 @@ quickTeamsCache.forEach((teamArr, i) => {
       if (n < 2) return alert("Atzīmē atnākušos.");
 
       const split = suggestedSplit(n);
-      const teamCount = split.length;
+      const teamCount = teamsArr.length;
 
       const teams = [];
       for (let t=0;t<teamCount;t++){
@@ -1425,6 +1446,7 @@ if (adminBtn) {
 });
       const wp = p.games ? (100*p.wins/p.games) : 0;
       const pts = (p.g||0) + (p.a||0);
+      const st = p; // lai strādā tavs `${st.w}-${st.l}-${st.d}`
       return `<tr>
         <td>${i+1}</td>
         <td>${escapeHtml(p.name)}</td>
